@@ -3,80 +3,85 @@ import streamlit as st
 def get_user_inputs():
     inputs = {}
     
-    # Поля ФИО
+    # Стандартные поля ФИО
     inputs['last_name'] = st.text_input("👤 Фамилия *", placeholder="Иванов")
     inputs['first_name'] = st.text_input("👤 Имя *", placeholder="Иван")
     inputs['middle_name'] = st.text_input("👤 Отчество (необязательно)", placeholder="Сергеевич")
     inputs['birth_year'] = st.text_input("📅 Год рождения (необязательно)", placeholder="1995")
     
     st.write("---")
-    st.write("📱 **Виртуальная клавиатура телефона:**")
+    st.write("📱 **Виртуальная клавиатура телефона (HTML + Циклы Python):**")
     
+    # Инициализируем буфер телефона
     if 'phone_buffer' not in st.session_state:
         st.session_state['phone_buffer'] = "+7"
         
-    st.info(f"### 📞 Набрано: {st.session_state['phone_buffer']}")
-    
-    # Хитрый трюк: Добавляем CSS-код, который принудительно запрещает 
-    # кнопкам внутри колонок переноситься на новую строку на смартфонах и планшетах!
-    st.markdown("""
-        <style>
-        [data-testid="stHorizontalBlock"] {
-            flex-direction: row !important;
-            gap: 15px !important;
-        }
-        [data-testid="column"] {
-            width: 30% !important;
-            flex: 1 1 30% !important;
-            min-width: 60px !important;
-        }
-        button p {
-            font-size: 20px !important; /* Делаем цифры внутри кнопок очень крупными */
-            font-weight: bold !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    # Строка 1: 1, 2, 3
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("1", use_container_width=True, key="k1"): st.session_state['phone_buffer'] += "1"
-    with col2:
-        if st.button("2", use_container_width=True, key="k2"): st.session_state['phone_buffer'] += "2"
-    with col3:
-        if st.button("3", use_container_width=True, key="k3"): st.session_state['phone_buffer'] += "3"
-        
-    # Строка 2: 4, 5, 6
-    col4, col5, col6 = st.columns(3)
-    with col4:
-        if st.button("4", use_container_width=True, key="k4"): st.session_state['phone_buffer'] += "4"
-    with col5:
-        if st.button("5", use_container_width=True, key="k5"): st.session_state['phone_buffer'] += "5"
-    with col6:
-        if st.button("6", use_container_width=True, key="k6"): st.session_state['phone_buffer'] += "6"
-        
-    # Строка 3: 7, 8, 9
-    col7, col8, col9 = st.columns(3)
-    with col7:
-        if st.button("7", use_container_width=True, key="k7"): st.session_state['phone_buffer'] += "7"
-    with col8:
-        if st.button("8", use_container_width=True, key="k8"): st.session_state['phone_buffer'] += "8"
-    with col9:
-        if st.button("9", use_container_width=True, key="k9"): st.session_state['phone_buffer'] += "9"
-        
-    # Строка 4: Сброс, 0, Удалить
-    col_clear, col0, col_back = st.columns(3)
-    with col_clear:
-        if st.button("❌", use_container_width=True, key="k_clear"): 
+    # Слушатель нажатий кнопок
+    if "click" in st.query_params:
+        clicked_val = st.query_params["click"]
+        if clicked_val == "clear":
             st.session_state['phone_buffer'] = "+7"
-    with col0:
-        if st.button("0", use_container_width=True, key="k0"): st.session_state['phone_buffer'] += "0"
-    with col_back:
-        if st.button("⬅️", use_container_width=True, key="k_back"):
+        elif clicked_val == "back":
             if len(st.session_state['phone_buffer']) > 2:
                 st.session_state['phone_buffer'] = st.session_state['phone_buffer'][:-1]
+        else:
+            st.session_state['phone_buffer'] += clicked_val
+            
+        st.query_params.clear()
+        st.rerun()
+
+    # Выводим крупно набранный номер
+    st.info(f"### 📞 Набрано: {st.session_state['phone_buffer']}")
+    
+    # ─── МАГИЯ ЦИКЛОВ И МАССИВОВ ───
+    # Описываем матрицу телефона в виде структуры данных (список строк)
+    # Вместо эмодзи передаем кодовые слова для логики кликов
+    phone_layout = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        ["clear", "0", "back"]
+    ]
+    
+    # Базовые CSS-стили для оформления кнопок
+    html_table = """
+    <style>
+        .phone-table { width: 100%; max-width: 300px; margin: 0 auto; border-collapse: separate; border-spacing: 8px; }
+        .phone-cell { width: 33%; text-align: center; background-color: #f0f2f6; border-radius: 8px; padding: 15px 0; font-weight: bold; font-size: 22px; }
+        .phone-cell a { color: #31333F !important; text-decoration: none !important; display: block; width: 100%; height: 100%; }
+        .phone-cell:active { background-color: #dddfe4; }
+        .special-btn { background-color: #ffe0e0; }
+    </style>
+    <table class="phone-table">
+    """
+    
+    # Запускаем вложенные циклы, чтобы сгенерировать HTML-код без дублирования
+    for row in phone_layout:
+        html_table += "<tr>"  # Открываем строчку таблицы HTML
+        for item in row:
+            # Превращаем технические слова в красивые иконки для экрана
+            display_text = item
+            cell_class = "phone-cell"
+            
+            if item == "clear":
+                display_text = "❌"
+                cell_class += " special-btn"
+            elif item == "back":
+                display_text = "⬅️"
+                cell_class += " special-btn"
+                
+            # Добавляем ячейку в строку таблицы
+            html_table += f'<td class="{cell_class}"><a href="/?click={item}">{display_text}</a></td>'
+            
+        html_table += "</tr>"  # Закрываем строчку таблицы HTML
+        
+    html_table += "</table>"
+    
+    # Выводим сгенерированный в цикле HTML-код на экран Streamlit
+    st.markdown(html_table, unsafe_allow_html=True)
 
     inputs['phone_raw'] = st.session_state['phone_buffer']
     inputs['feed_type'] = st.selectbox("📦 Какой корм выдаём?", ["Сухой для кошек", "Влажный для кошек"])
     
     return inputs
+
