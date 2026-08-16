@@ -9,79 +9,73 @@ import phone_input as pi
 import date_picker as dp
 import map_barnaul as mb
 
-# Настройка страницы для удобной работы на планшете
-st.set_page_config(page_title="Приют - Выдача корма", layout="wide")
+# Настройка страницы под экраны смартфонов
+st.set_page_config(page_title="Приют КОРМ", layout="centered")
 
-# Инициализируем базу данных при старте приложения
+# Инициализируем базу данных
 db.init_db()
 
-st.title("🐾 Система учета выдачи корма в приюте")
+st.title("🐾 Учет выдачи корма")
 
-# Создаем две вкладки
-tab1, tab2 = st.tabs(["📋 Регистрация выдачи", "🗂️ Просмотр базы и Аналитика"])
+# Две вкладки для телефона
+tab1, tab2 = st.tabs(["📋 Выдача", "🗂️ База и Карта"])
 
 with tab1:
-    st.header("Новая запись о выдаче корма")
-    st.caption("Поля, отмеченные звездочкой (*), обязательны для заполнения")
+    st.markdown("### 🔴 ОБЯЗАТЕЛЬНЫЕ ДАННЫЕ")
     
-    # Создаем форму для текстовых полей
-    with st.form("recipient_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### 🔴 Шаг 1: Обязательные текстовые данные")
-            last_name = st.text_input("Фамилия *")
-            first_name = st.text_input("Имя *")
-            district = st.selectbox(
-                "Район проживания в Барнауле *", 
-                ["Индустриальный", "Ленинский", "Железнодорожный", "Октябрьский", "Центральный"]
-            )
-            
-            st.write("---")
-            st.markdown("### ⚪ Шаг 2: Паспортные данные (По желанию)")
-            p_series = st.text_input("Серия паспорта (4 цифры)", max_chars=4)
-            p_number = st.text_input("Номер паспорта (6 цифр)", max_chars=6)
-            p_date = st.text_input("Дата выдачи паспорта (ДД.ММ.ГГГГ)")
-            p_code = st.text_input("Код подразделения", max_chars=7)
-            
-        with col2:
-            st.markdown("### ⚪ Шаг 3: Дополнительные анкетные данные (По желанию)")
-            middle_name = st.text_input("Отчество (По желанию)")
-            address = st.text_input("Адрес проживания (Улица, дом, кв)")
-            vk_link = st.text_input("Ссылка на профиль ВК")
-            feed_type = st.text_input("Какой корм выдан (например, Для кошек 5кг)")
-            
-        st.write("---")
-        submit_button = st.form_submit_button("💾 Сначала нажмите сюда: Зафиксировать текст из полей выше")
-
-    # ОБЯЗАТЕЛЬНЫЙ МОДУЛЬ ТЕЛЕФОНА — ТЕПЕРЬ СРАЗУ ПОД ФОРМОЙ
+    # 1. ФИО по отдельности
+    last_name = st.text_input("Фамилия *", key="reg_last_name")
+    first_name = st.text_input("Имя *", key="reg_first_name")
+    
+    # 2. Район проживания
+    district = st.selectbox(
+        "Район проживания в Барнауле *", 
+        ["Индустриальный", "Ленинский", "Железнодорожный", "Октябрьский", "Центральный"],
+        key="reg_district"
+    )
+    
+    # 3. Номер телефона (Кнопки появятся только при активации тумблера внутри модуля)
     st.write("---")
-    st.markdown("### 🔴 Шаг 4: Укажите номер телефона получателя *")
     phone_number = pi.render_phone_keyboard()
     
-    # Модуль выбора даты рождения (По желанию)
+    # 4. НЕОБЯЗАТЕЛЬНЫЕ ДАННЫЕ (Пошли ниже, чтобы не мешать на экране телефона)
     st.write("---")
-    birth_date_str = dp.render_date_picker(label="⚪ Шаг 5: Укажите дату рождения (По желанию)", key_prefix="main_birth")
+    st.markdown("### ⚪ НЕОБЯЗАТЕЛЬНЫЕ ДАННЫЕ (По желанию)")
+    
+    middle_name = st.text_input("Отчество (Если есть)")
+    address = st.text_input("Адрес проживания (Улица, дом)")
+    vk_link = st.text_input("Ссылка на ВК")
+    feed_type = st.text_input("Какой корм выдан (Например: Кэт Чау 3кг)")
     
     st.write("---")
-    st.markdown("### 🚀 Шаг 6: Финальное сохранение в систему")
+    st.markdown("**Паспортные данные**")
+    p_series = st.text_input("Серия паспорта", max_chars=4)
+    p_number = st.text_input("Номер паспорта", max_chars=6)
+    p_date = st.text_input("Дата выдачи паспорта")
+    p_code = st.text_input("Код подразделения", max_chars=7)
     
-    if st.button("✅ ПОЛНОСТЬЮ СОХРАНИТЬ ЗАПИСЬ В БАЗУ", type="primary"):
+    # Модуль выбора даты рождения
+    st.write("---")
+    birth_date_str = dp.render_date_picker(label="Дата рождения", key_prefix="main_birth")
+    
+    # КНОПКА СОХРАНЕНИЯ
+    st.write("---")
+    if st.button("🔥 СОХРАНИТЬ ЗАПИСЬ", type="primary", use_container_width=True):
         # Проверяем строго обязательные поля
         if not last_name.strip():
-            st.error("Критическая ошибка! Поле 'Фамилия' не может быть пустым.")
+            st.error("Заполните Фамилию!")
         elif not first_name.strip():
-            st.error("Критическая ошибка! Поле 'Имя' не может быть пустым.")
+            st.error("Заполните Имя!")
         elif not phone_number:
-            st.error("Критическая ошибка! Номер телефона обязателен и должен быть введен полностью с помощью кнопок клавиатуры выше.")
+            st.error("Введите ПОЛНЫЙ номер телефона (откройте клавиши выше)!")
         else:
-            # Собираем красивую строку ФИО для базы данных
+            # Собираем ФИО
             if middle_name.strip():
                 full_fio = f"{last_name.strip()} {first_name.strip()} {middle_name.strip()}"
             else:
                 full_fio = f"{last_name.strip()} {first_name.strip()}"
             
-            # Заполняем пустые паспортные данные уникальными значениями, чтобы избежать ошибок БД
+            # Защита базы от пустых паспортов
             final_series = p_series.strip() if p_series.strip() else "0000"
             final_number = p_number.strip() if p_number.strip() else f"б/н-{int(datetime.timestamp(datetime.now()))}"
             
@@ -101,26 +95,22 @@ with tab1:
                 "visit_date": datetime.today().strftime('%Y-%m-%d')
             }
             
-            # Сохраняем готовую запись в БД
             success = db.add_recipient(new_record)
             if success:
-                st.success(f"Запись для {full_fio} успешно добавлена в систему!")
-                # Очищаем телефонную сессию для следующего посетителя
+                st.success(f"Успешно сохранено для: {full_fio}")
+                # Сброс номера телефона для следующего человека
                 st.session_state.phone_digits = ""
                 st.rerun()
             else:
-                st.error("Критическая ошибка при генерации уникального ID для базы данных.")
+                st.error("Ошибка дублирования данных или сбой БД.")
 
 with tab2:
-    # Отображаем админ-панель с фильтрами и сортировкой из модуля database.py
+    # База данных адаптированная под телефон
     db.show_admin_panel()
-    
     st.write("---")
     
-    # Подгружаем актуальные данные для карты Барнаула
+    # Карта Барнаула
     conn = sqlite3.connect(db.DB_NAME)
     current_df = pd.read_sql_query("SELECT district FROM recipients", conn)
     conn.close()
-    
-    # Отображаем карту Барнаула со счетчиками людей по районам
     mb.render_barnaul_map(current_df)
