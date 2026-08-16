@@ -123,7 +123,7 @@ def show_admin_panel():
                 current_district = "Не определен"
                 
             current_phone = row.get('phone', '-')
-            # Выводим телефон прямо в шапку (в экспандер)
+            
             with st.expander(f"👤 {row.get('fio', 'Без имени')} | 📞 {current_phone} | [{current_district}]"):
                 # 1. КОНТАКТЫ (Кликабельный номер)
                 callable_phone = analytics.make_phone_callable(current_phone)
@@ -159,15 +159,21 @@ def show_admin_panel():
                 else:
                     st.markdown("**Фотоотчет:** Не прикреплен")
                 
-                st.write("---")
-                st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
-                
-                # 4. ОСТАЛЬНЫЕ ДАННЫЕ АНКЕТЫ
-                st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
-                st.text(f"Район проживания: {current_district}")
-                st.text(f"Адрес: {row.get('address', '-')}")
-                st.text(f"Выданный корм: {row.get('feed_type', '-')}")
-                st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
+                # 4. ОБНОВЛЕННАЯ ЛОГИКА И ПОРЯДОК ДОПОЛНИТЕЛЬНЫХ ДАННЫХ
+                with st.expander("📝 Показать полную анкету получателя", expanded=False):
+                    st.text(f"Номенклатура выданного корма: {row.get('feed_type', '-')}")
+                    st.text(f"Район проживания: {current_district}")
+                    st.text(f"Адрес проживания: {row.get('address', '-')}")
+                    st.text(f"Паспортные данные: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
+                    st.text(f"Подразделение (выдавшее паспорт): {row.get('passport_issued_by', '-')}")
+                    st.text(f"Дата рождения: {row.get('birth_date', '-')} (Возраст: {row.get('Возраст')})")
+                    
+                    # Кликабельная ссылка на страницу ВК получателя
+                    vk_url = row.get('vk_link', '')
+                    if vk_url and str(vk_url).startswith("http"):
+                        st.markdown(f"Личная страница получателя: <a href='{vk_url}' target='_blank' style='color: #2C3E50; font-weight: bold; text-decoration: underline;'>Перейти в ВК</a>", unsafe_allow_html=True)
+                    else:
+                        st.text(f"Личная страница получателя ВК: {vk_url if vk_url else '-'}")
                 
                 st.write("---")
                 # Кнопки управления анкетой
