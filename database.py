@@ -28,9 +28,8 @@ def show_admin_panel():
         st.info("Архив базы данных пуст.")
         return
 
-    # 1. СОРТИРОВКА И РАЙОНЫ
+    # 1. СОРТИРОВКА И РАЙОНЫ (ИСПРАВЛЕНО: убрана сортировка по районам)
     sort_options = {
-        "По районам города (А-Я)": ("district", True),
         "Сначала новые визиты": ("visit_date", False),
         "Сначала старые визиты": ("visit_date", True),
         "От старших к младшим (Возраст)": ("Возраст", True),
@@ -41,9 +40,10 @@ def show_admin_panel():
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     selected_districts = st.multiselect("Фильтр по районам города (Оставьте пустым для показа ВСЕЙ базы)", options=all_barnaul_districts, default=[])
 
+    # НАСТРОЙКА ВИДА ВЫВОДА (ИСПРАВЛЕНО: текст переключателя изменен)
     view_mode = st.radio(
         "Формат вывода данных:",
-        ["Полная анкета (Карточки)", "Компактный вид (Только ФИО + Телефон)"],
+        ["Полная анкета (Карточки)", "Компактный вид (ФИО + Телефон + Район + Дата)"],
         horizontal=True
     )
 
@@ -112,8 +112,8 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
-    # Отображение данных
-    if view_mode == "Компактный вид (Только ФИО + Телефон)":
+    # Отображение данных (ИСПРАВЛЕНО: обновлен текст условия соответствия радиокнопке)
+    if view_mode == "Компактный вид (ФИО + Телефон + Район + Дата)":
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
         st.dataframe(short_df, use_container_width=True, hide_index=True)
@@ -136,7 +136,6 @@ def show_admin_panel():
                 photo_person = "Не указана"
                 photo_receipt = "Не указана"
                 
-                # Безопасно разбираем строку с фотографиями
                 if photo_str and "|" in str(photo_str):
                     try:
                         parts = str(photo_str).split("|")
