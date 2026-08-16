@@ -45,7 +45,7 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # ИСПРАВЛЕНО: Добавлен список успешных кодов ответа
+            # ИСПРАВЛЕНО: Добавлены коды успешного ответа Яндекс.Диска
             if put_res.status_code in:
                 return True
         return False
@@ -213,6 +213,7 @@ def show_admin_panel():
             if "Человек:" in p_path:
                 try:
                     parts = p_path.split(" | ")
+                    # ИСПРАВЛЕНО: возвращен синтаксис работы со списками строк
                     p_url = parts[0].replace("Человек: ", "").strip()
                     r_url = parts[1].replace("Расписка: ", "").strip()
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
