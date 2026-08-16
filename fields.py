@@ -35,7 +35,7 @@ def get_user_inputs():
             font-weight: bold !important;
         }
         </style>
-    """, unsafe_allowed_html=True)
+    """, unsafe_allow_html=True)
     
     # Строка 1: 1, 2, 3
     col1, col2, col3 = st.columns(3)
