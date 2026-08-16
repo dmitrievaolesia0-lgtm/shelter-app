@@ -154,12 +154,24 @@ def show_admin_panel():
                     st.markdown(f"**Паспортные данные:** {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
                     st.markdown(f"**Подразделение:** {row.get('passport_code', '-')}")
                     st.markdown(f"**Дата рождения:** {row.get('birth_date', '-')} (Возраст: {row.get('Возраст')})")
+
+                                        vk_url = row.get('vk_link', '')
+                    # Импортируем функцию конвертации на лету
+                    vk_deeplink = core.make_vk_deeplink(vk_url)
                     
-                    vk_url = row.get('vk_link', '')
-                    if vk_url and str(vk_url).startswith("http"):
-                        st.markdown(f"**Личная страница ВК:** <a href='{vk_url}' target='_blank' style='color: #2C3E50; font-weight: bold; text-decoration: underline;'>Перейти в ВК</a>", unsafe_allow_html=True)
+                    if vk_deeplink:
+                        # Ссылка использует протокол vk:// для открытия сразу в приложении смартфона
+                        st.markdown(
+                            f"**Личная страница ВК:** "
+                            f"<a href='{vk_deeplink}' target='_blank' style='color: #1f77b4; font-weight: bold; text-decoration: underline;'>"
+                            f"📱 Открыть в приложении ВК"
+                            f"</a>", 
+                            unsafe_allow_html=True
+                        )
                     else:
-                        st.markdown(f"**Личная страница ВК:** {vk_url if vk_url else '-'}")
+                        st.markdown(f"**Личная страница ВК:** -")
+
+                    
                 
                 st.write("---")
                 btn_col1, btn_col2 = st.columns(2)
