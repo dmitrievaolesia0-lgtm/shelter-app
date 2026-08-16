@@ -24,69 +24,58 @@ with tab1:
     st.header("Новая запись о выдаче корма")
     st.caption("Поля, отмеченные звездочкой (*), обязательны для заполнения")
     
-    # Создаем форму для ввода данных
+    # Создаем форму для текстовых полей
     with st.form("recipient_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Основная информация (ФИО и Район)**")
-            # ОБЯЗАТЕЛЬНЫЕ ПОЛЯ ФИО
+            st.markdown("### 🔴 Шаг 1: Обязательные текстовые данные")
             last_name = st.text_input("Фамилия *")
             first_name = st.text_input("Имя *")
-            # НЕОБЯЗАТЕЛЬНОЕ ПОЛЕ
-            middle_name = st.text_input("Отчество (По желанию)")
-            
-            # ОБЯЗАТЕЛЬНОЕ ПОЛЕ РАЙОНА
             district = st.selectbox(
                 "Район проживания в Барнауле *", 
                 ["Индустриальный", "Ленинский", "Железнодорожный", "Октябрьский", "Центральный"]
             )
             
             st.write("---")
-            st.markdown("**Паспортные данные (По желанию)**")
+            st.markdown("### ⚪ Шаг 2: Паспортные данные (По желанию)")
             p_series = st.text_input("Серия паспорта (4 цифры)", max_chars=4)
             p_number = st.text_input("Номер паспорта (6 цифр)", max_chars=6)
-            
-        with col2:
-            st.markdown("**Дополнительные данные (По желанию)**")
             p_date = st.text_input("Дата выдачи паспорта (ДД.ММ.ГГГГ)")
             p_code = st.text_input("Код подразделения", max_chars=7)
             
-            st.write("---")
+        with col2:
+            st.markdown("### ⚪ Шаг 3: Дополнительные анкетные данные (По желанию)")
+            middle_name = st.text_input("Отчество (По желанию)")
             address = st.text_input("Адрес проживания (Улица, дом, кв)")
             vk_link = st.text_input("Ссылка на профиль ВК")
             feed_type = st.text_input("Какой корм выдан (например, Для кошек 5кг)")
             
         st.write("---")
-        submit_button = st.form_submit_button("📁 Шаг 1: Зафиксировать текстовые поля")
+        submit_button = st.form_submit_button("💾 Сначала нажмите сюда: Зафиксировать текст из полей выше")
 
+    # ОБЯЗАТЕЛЬНЫЙ МОДУЛЬ ТЕЛЕФОНА — ТЕПЕРЬ СРАЗУ ПОД ФОРМОЙ
     st.write("---")
-    
-    # Интерактивные модули (ввод даты и телефона) находятся под основной формой, 
-    # так как они обновляют экран при каждом нажатии кнопок на планшете
-    
-    # Модуль выбора даты рождения (По желанию)
-    birth_date_str = dp.render_date_picker(label="Дата рождения получателя (По желанию)", key_prefix="main_birth")
-    
-    # Модуль экранной клавиатуры для телефона (ОБЯЗАТЕЛЬНОЕ ПОЛЕ)
-    st.write("---")
-    st.markdown("**Номер телефона получателя \***")
+    st.markdown("### 🔴 Шаг 4: Укажите номер телефона получателя *")
     phone_number = pi.render_phone_keyboard()
     
+    # Модуль выбора даты рождения (По желанию)
     st.write("---")
-    st.subheader("🚀 Шаг 3: Финальное сохранение в базу")
+    birth_date_str = dp.render_date_picker(label="⚪ Шаг 5: Укажите дату рождения (По желанию)", key_prefix="main_birth")
     
-    if st.button("✅ ПОЛНОСТЬЮ СОХРАНИТЬ ЗАПИСЬ", type="primary"):
+    st.write("---")
+    st.markdown("### 🚀 Шаг 6: Финальное сохранение в систему")
+    
+    if st.button("✅ ПОЛНОСТЬЮ СОХРАНИТЬ ЗАПИСЬ В БАЗУ", type="primary"):
         # Проверяем строго обязательные поля
         if not last_name.strip():
             st.error("Критическая ошибка! Поле 'Фамилия' не может быть пустым.")
         elif not first_name.strip():
             st.error("Критическая ошибка! Поле 'Имя' не может быть пустым.")
         elif not phone_number:
-            st.error("Критическая ошибка! Номер телефона обязателен (10 цифр после +7).")
+            st.error("Критическая ошибка! Номер телефона обязателен и должен быть введен полностью с помощью кнопок клавиатуры выше.")
         else:
             # Собираем красивую строку ФИО для базы данных
-            # Если отчество есть, добавляем его, если нет — пишем только Фамилию и Имя
             if middle_name.strip():
                 full_fio = f"{last_name.strip()} {first_name.strip()} {middle_name.strip()}"
             else:
@@ -110,7 +99,7 @@ with tab1:
                 "feed_type": feed_type.strip() if feed_type.strip() else "Не указан",
                 "photo_path": "No photo",
                 "visit_date": datetime.today().strftime('%Y-%m-%d')
-            }
+            }_
             
             # Сохраняем готовую запись в БД
             success = db.add_recipient(new_record)
