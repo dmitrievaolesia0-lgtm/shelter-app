@@ -118,3 +118,4 @@ with st.form("main_registration_form"):
             st.success("Данные успешно приняты и сохранены!")
             # Здесь вы можете прописать логику связи с другими вашими файлами:
             # Например: save_to_database(st.session_state.entered_code, district, birth_date, address)
+
