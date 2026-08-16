@@ -5,7 +5,7 @@ from datetime import date, datetime
 import yandex_cloud as cloud
 import db_core as core
 import db_dialogs as dialogs
-import db_analytics as analytics
+import db_analytics as analytics  # Подключаем модуль аналитики
 
 # Перенаправляем функции для совместимости с главным файлом app.py
 init_db = core.init_db
@@ -106,12 +106,7 @@ def show_admin_panel():
     display_df['Возраст'] = display_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
     st.session_state.shelter_records = display_df
 
-
-    # Конец вашего кода отображения...
-st.write("---")
-# Вызываем графики и передаем им отфильтрованную таблицу
-analytics.render_analytics_charts(display_df)
-
+    st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
     # Отображение данных
@@ -139,5 +134,8 @@ analytics.render_analytics_charts(display_df)
                     if st.button("✏️ Редактировать", key=f"edit_{idx}", use_container_width=True):
                         dialogs.edit_dialog(idx, row, df)
                 with btn_col2:
-                    if st.button("🗑️ Удалить", key=f"del_{idx}", use_container_width=True):
+                    if st.button("🚨 Удалить", key=f"del_{idx}", use_container_width=True):
                         dialogs.delete_dialog(idx, row.get('fio', 'Без имени'), df)
+
+    # Обязательный вызов графиков в самом конце панели
+    analytics.render_analytics_charts(display_df)
