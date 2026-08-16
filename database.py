@@ -111,34 +111,72 @@ def show_admin_panel():
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
     # Отображение
+        # Отображение данных
     if view_mode == "Компактный вид (Только ФИО + Телефон)":
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
         st.dataframe(short_df, use_container_width=True, hide_index=True)
     else:
         for idx, row in filtered_df.iterrows():
-            with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{row.get('district', 'Не определен')}]"):
+            current_district = row.get('district', 'Не определен')
+            if not current_district or pd.isna(current_district):
+                current_district = "Не определен"
+                
+            with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{current_district}]"):
+                # 1. КОНТАКТЫ (Кликабельный номер телефона)
                 callable_phone = analytics.make_phone_callable(row.get('phone', '-'))
                 st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
 
+                # 2. ДАТА ВИЗИТА
                 st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
+                
+                # 3. ССЫЛКИ НА ФОТООТЧЕТ (ДОБАВЛЕНО СЮДА)
+                photo_str = row.get('photo_path', '')
+                photo_person = "Не указана"
+                photo_receipt = "Не указана"
+                
+                if photo_str and "|" in photo_str:
+                    try:
+                        parts = photo_str.split("|")
+                        photo_person = parts[0].replace("Человек:", "").strip()
+                        photo_receipt = parts[1].replace("Расписка:", "").strip()
+                    except:
+                        pass
+                
+                # Компактный вывод кликабельных ссылок на фото
+                links_html = []
+                if photo_person and photo_person != "Не указана":
+                    links_html.append(f'<a href="{photo_person}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото получателя</a>')
+                if photo_receipt and photo_receipt != "Не указана":
+                    links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото расписки</a>')
+                
+                if links_html:
+                    st.markdown(f"**Фотоотчет:** {' | '.join(links_html)}", unsafe_allow_html=True)
+                else:
+                    st.markdown("**Фотоотчет:** Не прикреплен")
+                
                 st.write("---")
                 st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
+                
+                # 4. ОСТАЛЬНЫЕ ДАННЫЕ АНКЕТЫ (ВЕРНУЛИ НА МЕСТО)
                 st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
+                st.text(f"Район проживания: {current_district}")
                 st.text(f"Адрес: {row.get('address', '-')}")
                 st.text(f"Выданный корм: {row.get('feed_type', '-')}")
                 st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
                 
                 st.write("---")
+                # Кнопки управления анкетой
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
                     if st.button("✏️ Редактировать", key=f"edit_{idx}", use_container_width=True):
                         dialogs.edit_dialog(idx, row, df)
-                        core.clear_db_cache()  # Сбрасываем кэш после редактирования
+                        core.clear_db_cache()
                 with btn_col2:
                     if st.button("🚨 Удалить", key=f"del_{idx}", use_container_width=True):
                         dialogs.delete_dialog(idx, row.get('fio', 'Без имени'), df)
-                        core.clear_db_cache()  # Сбрасываем кэш после удаления
+                        core.clear_db_cache()
 
-    # Моментальные графики
+    # Схематичные графики
     analytics.render_analytics_charts(display_df)
+    
