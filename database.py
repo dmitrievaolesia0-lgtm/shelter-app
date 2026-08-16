@@ -106,7 +106,12 @@ def show_admin_panel():
     display_df['Возраст'] = display_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
     st.session_state.shelter_records = display_df
 
-    st.write("---")
+
+    # Конец вашего кода отображения...
+st.write("---")
+# Вызываем графики и передаем им отфильтрованную таблицу
+analytics.render_analytics_charts(display_df)
+
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
     # Отображение данных
@@ -117,7 +122,9 @@ def show_admin_panel():
     else:
         for idx, row in filtered_df.iterrows():
             with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{row.get('district', 'Не определен')}]"):
-                st.markdown(f"**Контакты:** {row.get('phone', '-')}")
+                callable_phone = analytics.make_phone_callable(row.get('phone', '-'))
+                st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
+
                 st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
                 st.write("---")
                 st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
