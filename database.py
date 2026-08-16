@@ -10,7 +10,7 @@ FILE_PATH_ON_DISK = "shelter_base.xlsx"
 
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. Четверг", 4: "5. Пятница", 5: "6. суббота", 6: "7. Воскресенье"
+    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
 }
 
 def download_from_yandex():
@@ -64,21 +64,29 @@ def add_recipient(data_dict):
         
     df = download_from_yandex()
     
-    # Проверка на дубликат строго по ФИО и Номеру телефона (если они заполнены)
-    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
-        curr_fio = str(data_dict.get('fio', '')).strip().lower()
-        curr_phone = str(data_dict.get('phone', '')).strip().lower()
+    # Жесткая очистка: если таблица пустая или в ней нет нужных колонок, сразу сохраняем
+    if df.empty or 'fio' not in df.columns or 'phone' not in df.columns:
+        new_row_df = pd.DataFrame([data_dict])
+        return upload_to_yandex(new_row_df)
         
-        if curr_fio and curr_phone and curr_phone not in ["", "nan", "none", "-"]:
-            db_fio = df['fio'].astype(str).str.strip().str.lower()
-            db_phone = df['phone'].astype(str).str.strip().str.lower()
+    curr_fio = str(data_dict.get('fio', '')).strip().lower()
+    curr_phone = str(data_dict.get('phone', '')).strip().lower()
+    
+    # Проверяем дубликат только если ФИО и телефон реально заполнены
+    if curr_fio and curr_phone:
+        # Удаляем пустые ячейки (NaN) перед сравнением строк
+        temp_df = df.dropna(subset=['fio', 'phone']).copy()
+        if not temp_df.empty:
+            db_fio = temp_df['fio'].astype(str).str.strip().str.lower()
+            db_phone = temp_df['phone'].astype(str).str.strip().str.lower()
             
-            duplicate = df[(db_fio == curr_fio) & (db_phone == curr_phone)]
+            duplicate = temp_df[(db_fio == curr_fio) & (db_phone == curr_phone)]
             if not duplicate.empty:
-                return False  # Найден реальный дубликат по ФИО + Телефон
+                return False  # Настоящий дубликат найден, блокируем
 
+    # Если дубликатов нет — добавляем новую запись и сохраняем в облако
     new_row_df = pd.DataFrame([data_dict])
-    updated_df = pd.concat([df, new_row_df], ignore_index=True) if not df.empty else new_row_df
+    updated_df = pd.concat([df, new_row_df], ignore_index=True)
     return upload_to_yandex(updated_df)
 
 def calculate_age(birth_date_str):
@@ -190,8 +198,8 @@ def show_admin_panel():
                 if "Человек:" in p_path:
                     try:
                         parts = p_path.split(" | ")
-                        p_url = parts.replace("Человек: ", "").strip()
-                        r_url = parts.replace("Расписка: ", "").strip()
+                        p_url = parts[0].replace("Человек: ", "").strip()
+                        r_url = parts[1].replace("Расписка: ", "").strip()
                         if p_url and p_url != "Не указана":
                             st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
                         if r_url and r_url != "Не указана":
