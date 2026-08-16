@@ -28,7 +28,7 @@ def show_admin_panel():
         st.info("Архив базы данных пуст.")
         return
 
-    # 1. СОРТИРОВКА И РАЙОНЫ (ИСПРАВЛЕНО: убрана сортировка по районам)
+    # 1. СОРТИРОВКА И РАЙОНЫ
     sort_options = {
         "Сначала новые визиты": ("visit_date", False),
         "Сначала старые визиты": ("visit_date", True),
@@ -40,7 +40,6 @@ def show_admin_panel():
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     selected_districts = st.multiselect("Фильтр по районам города (Оставьте пустым для показа ВСЕЙ базы)", options=all_barnaul_districts, default=[])
 
-    # НАСТРОЙКА ВИДА ВЫВОДА (ИСПРАВЛЕНО: текст переключателя изменен)
     view_mode = st.radio(
         "Формат вывода данных:",
         ["Полная анкета (Карточки)", "Компактный вид (ФИО + Телефон + Район + Дата)"],
@@ -52,8 +51,7 @@ def show_admin_panel():
     # 2. РАЗДЕЛЬНЫЙ ПОИСК
     col1, col2 = st.columns(2)
     with col1:
-        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...")
-
+        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...", key="search_fio_input")
     with col2:
         search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...")
 
@@ -87,8 +85,7 @@ def show_admin_panel():
     filtered_df = df.copy()
     
     if search_fio:
-    filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False)]
-
+        filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False)]
         
     if search_phone:
         filtered_df = filtered_df[filtered_df['phone'].astype(str).str.contains(search_phone, na=False)]
@@ -114,7 +111,7 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
-    # Отображение данных (ИСПРАВЛЕНО: обновлен текст условия соответствия радиокнопке)
+    # Отображение данных
     if view_mode == "Компактный вид (ФИО + Телефон + Район + Дата)":
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
