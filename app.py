@@ -17,8 +17,8 @@ tab1, tab2 = st.tabs(["Ввод данных", "Архив и аналитика
 with tab1:
     st.caption("ОБЯЗАТЕЛЬНЫЕ ДАННЫЕ")
     
-    last_name = st.text_input("Фамилия *", placeholder="Иванов")
-    first_name = st.text_input("Имя *", placeholder="Иван")
+    last_name = st.text_input("Фамилия *", placeholder="Бортников")
+    first_name = st.text_input("Имя *", placeholder="Игорь")
     middle_name = st.text_input("Отчество *", placeholder="Иванович")
     
     district = st.selectbox(
