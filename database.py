@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, date
 
 DB_NAME = "shelter_data.db"
 
@@ -24,7 +24,7 @@ def init_db():
             address TEXT,
             feed_type TEXT,
             photo_path TEXT,
-            visit_date TEXT, -- Новое поле: дата получения корма
+            visit_date TEXT, -- Автоматическая дата получения корма
             UNIQUE(passport_series, passport_number)
         )
     """)
@@ -55,7 +55,7 @@ def add_recipient(data_dict):
         conn.close()
 
 def show_admin_panel():
-    """Отображает панель с фильтрами и расширенной сортировкой."""
+    """Отображает панель с фильтрами по району, поиску и ДАТЕ ВИЗИТА."""
     st.title("🗂️ База данных приюта")
 
     init_db()
@@ -68,25 +68,44 @@ def show_admin_panel():
         return
 
     st.subheader("🔍 Фильтрация, поиск и сортировка")
+    
+    # Поиск по тексту и району
+    search_fio = st.text_input("Поиск по ФИО или телефону")
+    
     col1, col2 = st.columns(2)
-
     with col1:
-        search_fio = st.text_input("Поиск по ФИО или телефону")
         districts = ["Все"] + list(df["district"].unique())
         selected_district = st.selectbox("Фильтр по району", districts)
-
+        
     with col2:
-        # Новые инструменты сортировки
         sort_options = {
             "Сначала новые визиты": ("visit_date", False),
             "Сначала старые визиты": ("visit_date", True),
             "По алфавиту (ФИО)": ("fio", True),
-            "По дате рождения (от старших)": ("birth_date", True),
-            "По дате рождения (от младших)": ("birth_date", False)
         }
         selected_sort = st.selectbox("Сортировка данных", list(sort_options.keys()))
 
-    # Применение фильтров
+    # --- НОВЫЙ БЛОК: Фильтр по датам посещения ---
+    st.write("---")
+    st.markdown("**📅 Выберите период посещения приюта:**")
+    
+    # Превращаем текстовые даты из базы данных в формат дат для календаря Pandas
+    df['visit_date_parsed'] = pd.to_datetime(df['visit_date']).dt.date
+    
+    min_date = df['visit_date_parsed'].min()
+    max_date = df['visit_date_parsed'].max()
+    
+    # Календарь-слайдер для выбора диапазона (например, с 01.08 по 16.08)
+    date_range = st.date_input(
+        "Диапазон дат",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+        key="visit_filter_range"
+    )
+    st.write("---")
+
+    # Применение текстовых фильтров
     filtered_df = df.copy()
     if search_fio:
         filtered_df = filtered_df[
@@ -96,12 +115,23 @@ def show_admin_panel():
     if selected_district != "Все":
         filtered_df = filtered_df[filtered_df['district'] == selected_district]
 
-    # Применение сортировки через Pandas
+    # Применение фильтра по датам (проверяем, выбрал ли пользователь одну дату или диапазон)
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+        filtered_df = filtered_df[
+            (filtered_df['visit_date_parsed'] >= start_date) & 
+            (filtered_df['visit_date_parsed'] <= end_date)
+        ]
+
+    # Применение сортировки
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
 
+    # Удаляем временную колонку перед показом пользователю
+    filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+
     st.subheader(f"📋 Найдено записей: {len(filtered_df)} из {len(df)}")
-    st.dataframe(filtered_df)
+    st.dataframe(filtered_df, use_container_width=True)
 
 if __name__ == "__main__":
     show_admin_panel()
