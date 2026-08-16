@@ -23,16 +23,19 @@ def render_analytics_charts(df):
         st.info("Нет данных для построения графиков.")
         return
 
-    # Разделяем экран на две колонки под два графика
     col1, col2 = st.columns(2)
     
     with col1:
         st.caption("📅 Посещаемость по дням недели")
         if 'День недели визита' in df.columns:
-            # Считаем количество визитов в каждый день
+            # Правильный порядок дней для жесткой сортировки графика
+            correct_order = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+            
             weekday_counts = df['День недели визита'].value_counts().reset_index()
             weekday_counts.columns = ['День недели', 'Количество визитов']
-            # Сортируем, чтобы Понедельник всегда был сверху/первым (благодаря цифрам '1.', '2.' в названиях)
+            
+            # Переводим колонку в категориальный тип для сохранения правильного порядка
+            weekday_counts['День недели'] = pd.Categorical(weekday_counts['День недели'], categories=correct_order, ordered=True)
             weekday_counts = weekday_counts.sort_values(by='День недели')
             
             fig_week = px.bar(
@@ -41,7 +44,8 @@ def render_analytics_charts(df):
                 y='День недели', 
                 orientation='h',
                 color='День недели',
-                template='plotly_white'
+                template='plotly_white',
+                category_orders={"День недели": correct_order} # Насильно задаем порядок на графике
             )
             fig_week.update_layout(showlegend=False, height=300, margin=dict(l=20, r=20, t=20, b=20))
             st.plotly_chart(fig_week, use_container_width=True)
@@ -58,10 +62,14 @@ def render_analytics_charts(df):
                 district_counts, 
                 values='Количество', 
                 names='Район',
-                hole=0.4, # Делаем красивый пончик вместо обычного круга
+                hole=0.4,
                 color_discrete_sequence=px.colors.sequential.RdBu
             )
             fig_dist.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20))
             st.plotly_chart(fig_dist, use_container_width=True)
         else:
             st.warning("Колонка районов недоступна.")
+
+
+
+    
