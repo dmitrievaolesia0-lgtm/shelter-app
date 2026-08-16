@@ -25,6 +25,7 @@ def init_db():
 
 init_db()
 
+st.set_page_config(page_title="Приют Кошек", page_icon="🐱", layout="wide")
 st.title("🐱 Учёт выдачи корма для кошек")
 st.subheader("Регистрация выдачи")
 
