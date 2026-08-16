@@ -1,98 +1,114 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
+import sqlite3
+from datetime import datetime
 
-from fields import get_user_inputs
-from validators import validate_phone
+# Импортируем наши созданные модули
+import database as db
+import phone_input as pi
+import date_picker as dp
+import map_barnaul as mb
 
-# Инициализация сессии для телефона ДО вызова виджетов
-if 'phone_buffer' not in st.session_state:
-    st.session_state['phone_buffer'] = "+7"
+# Настройка страницы для удобной работы на планшете
+st.set_page_config(page_title="Приют - Выдача корма", layout="wide")
 
-def init_db():
-    conn = sqlite3.connect('shelter_cats.db')
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS food_delivery (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            last_name TEXT NOT NULL,
-            first_name TEXT NOT NULL,
-            middle_name TEXT,
-            birth_year TEXT,
-            phone TEXT NOT NULL UNIQUE,
-            feed_type TEXT NOT NULL,
-            delivery_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+# Инициализируем базу данных при старте приложения
+db.init_db()
 
-init_db()
+st.title("🐾 Система учета выдачи корма в приюте")
 
-st.set_page_config(page_title="Приют Кошек", page_icon="🐱", layout="wide")
-st.title("🐱 Учёт выдачи корма для кошек")
-st.subheader("Регистрация выдачи")
+# Создаем две вкладки: для работы волонтера и для просмотра базы
+tab1, tab2 = st.tabs(["📋 Регистрация выдачи", "🗂️ Просмотр базы и Аналитика"])
 
-# Оборачиваем ввод в форму для изоляции триггеров
-with st.form("delivery_registration_form", clear_on_submit=False):
+with tab1:
+    st.header("Новая запись о выдаче корма")
     
-    # Функция должна принимать или использовать st.session_state['phone_buffer'] внутри себя как key
-    user_data = get_user_inputs()
-    
-    # Кнопка отправки формы (заменяет обычный st.button)
-    submit_btn = st.form_submit_button("💾 ПРОВЕРИТЬ И СОХРАНИТЬ", use_container_width=True)
-
-# Обработка нажатия кнопки формы
-if submit_btn:
-    if user_data.get('last_name') and user_data.get('first_name') and user_data.get('phone_raw'):
-        is_valid, phone_result = validate_phone(user_data['phone_raw'])
+    # Создаем форму для ввода данных
+    with st.form("recipient_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
         
-        if not is_valid:
-            st.error(phone_result)
+        with col1:
+            fio = st.text_input("ФИО получателя (Полностью)")
+            
+            st.write("---")
+            st.markdown("**Паспортные данные**")
+            p_series = st.text_input("Серия паспорта (4 цифры)", max_chars=4)
+            p_number = st.text_input("Номер паспорта (6 цифр)", max_chars=6)
+            p_date = st.text_input("Дата выдачи паспорта (ДД.ММ.ГГГГ)")
+            p_code = st.text_input("Код подразделения", max_chars=7)
+            
+        with col2:
+            district = st.selectbox(
+                "Район проживания в Барнауле", 
+                ["Индустриальный", "Ленинский", "Железнодорожный", "Октябрьский", "Centralный"]
+            )
+            address = st.text_input("Адрес проживания (Улица, дом, кв)")
+            vk_link = st.text_input("Ссылка на профиль ВК")
+            feed_type = st.text_input("Какой корм выдан (например, Для кошек 5кг)")
+            
+        st.write("---")
+        
+        # Кнопка отправки формы
+        submit_button = st.form_submit_button("📁 Зафиксировать основные данные")
+
+    st.write("---")
+    
+    # Сложные интерактивные модули (ввод даты и телефона) выносим под форму, 
+    # так как они обновляют экран при каждом нажатии кнопок
+    
+    # 1. Модуль выбора даты рождения
+    birth_date_str = dp.render_date_picker(label="Дата рождения получателя", key_prefix="main_birth")
+    
+    # 2. Модуль экранной клавиатуры для телефона
+    st.write("---")
+    phone_number = pi.render_phone_keyboard()
+    
+    st.write("---")
+    st.subheader("🚀 Шаг 3: Финальное сохранение в базу")
+    
+    if st.button("✅ ПОЛНОСТЬЮ СОХРАНИТЬ ЗАПИСЬ", type="primary"):
+        if not fio or not p_series or not p_number:
+            st.error("Ошибка! ФИО, серия и номер паспорта обязательны для заполнения.")
+        elif not phone_number:
+            st.error("Ошибка! Номер телефона должен быть введен полностью (10 цифр после +7).")
         else:
-            try:
-                conn = sqlite3.connect('shelter_cats.db')
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO food_delivery 
-                    (last_name, first_name, middle_name, birth_year, phone, feed_type)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    user_data['last_name'], 
-                    user_data['first_name'], 
-                    user_data['middle_name'], 
-                    user_data['birth_year'], 
-                    phone_result,
-                    user_data['feed_type']
-                ))
-                conn.commit()
-                conn.close()
-                
-                # Выводим сообщение об успехе глобально
-                st.success(f"🎉 Успешно сохранено! Номер: {phone_result}")
-                
-                # Сбрасываем буфер телефона и принудительно обновляем интерфейс
-                st.session_state['phone_buffer'] = "+7"
+            # Собираем все данные в один словарь для базы данных
+            new_record = {
+                "fio": fio,
+                "birth_date": birth_date_str,
+                "passport_series": p_series,
+                "passport_number": p_number,
+                "passport_date": p_date,
+                "passport_code": p_code,
+                "phone": phone_number,
+                "district": district,
+                "vk_link": vk_link,
+                "address": address,
+                "feed_type": feed_type,
+                "photo_path": "No photo", # Пока работаем без фото
+                "visit_date": datetime.today().strftime('%Y-%m-%d')
+            }
+            
+            # Отправляем в базу данных
+            success = db.add_recipient(new_record)
+            if success:
+                st.success(f"Запись для {fio} успешно добавлена! Выдача зафиксирована.")
+                # Очищаем телефон для следующего ввода
+                st.session_state.phone_digits = ""
                 st.rerun()
-                
-            except sqlite3.IntegrityError:
-                st.error("⚠️ Ошибка: Человек с таким номером телефона уже есть в базе данных!")
-    else:
-        st.warning("❗ Заполните обязательные поля: Фамилия, Имя и Телефон.")
+            else:
+                st.error("Критическая ошибка: Человек с такими паспортными данными (Серия и Номер) УЖЕ есть в базе! Дубль заблокирован.")
 
-st.divider()
-st.subheader("📊 База данных")
-
-# Безопасное чтение из БД
-try:
-    conn = sqlite3.connect('shelter_cats.db')
-    df = pd.read_sql_query("SELECT * FROM food_delivery ORDER BY id DESC", conn)
+with tab2:
+    # Отображаем админ-панель с фильтрами и сортировкой из модуля database.py
+    db.show_admin_panel()
+    
+    st.write("---")
+    
+    # Подгружаем актуальные данные для карты Барнаула
+    conn = sqlite3.connect(db.DB_NAME)
+    current_df = pd.read_sql_query("SELECT district FROM recipients", conn)
     conn.close()
-
-    if not df.empty:
-        # Настройка отображения таблицы (скрываем технический ID по желанию)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-    else:
-        st.info("База пока пуста.")
-except Exception as e:
-    st.error(f"Ошибка загрузки базы данных: {e}")
+    
+    # Отображаем карту Барнаула со счетчиками людей по районам
+    mb.render_barnaul_map(current_df)
