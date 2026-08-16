@@ -121,11 +121,12 @@ def show_admin_panel():
             current_district = row.get('district', 'Не определен')
             if not current_district or pd.isna(current_district):
                 current_district = "Не определен"
-             current_phone = row.get('phone', '-')
-            
+                
+            current_phone = row.get('phone', '-')
+            # Выводим телефон прямо в шапку (в экспандер)
             with st.expander(f"👤 {row.get('fio', 'Без имени')} | 📞 {current_phone} | [{current_district}]"):
                 # 1. КОНТАКТЫ (Кликабельный номер)
-                callable_phone = analytics.make_phone_callable(row.get('phone', '-'))
+                callable_phone = analytics.make_phone_callable(current_phone)
                 st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
 
                 # 2. ДАТА ВИЗИТА
