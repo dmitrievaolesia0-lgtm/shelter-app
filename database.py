@@ -2,13 +2,11 @@ import streamlit as st
 import pandas as pd
 import requests
 import io
-import urllib.parse
 from datetime import datetime, date
 
-# --- НАСТРОЙКИ ЯНДЕКСА ---
-# Безопасно берем токен из секретов Streamlit или вставляй строку из Полигона
+# Получаем токен из скрытых настроек Secrets
 YANDEX_TOKEN = st.secrets.get("YANDEX_TOKEN", "")
-FILE_PATH_ON_DISK = "shelter_base.xlsx"  # Имя файла-таблицы на твоем Яндекс.Диске
+FILE_PATH_ON_DISK = "shelter_base.xlsx"
 
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
@@ -16,7 +14,6 @@ WEEKDAYS_RU = {
 }
 
 def download_from_yandex():
-    """Скачивает Excel файл с Яндекс Диска в память"""
     url = f"https://yandex.net{FILE_PATH_ON_DISK}"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -30,12 +27,10 @@ def download_from_yandex():
             ])
         file_res = requests.get(download_url)
         return pd.read_excel(io.BytesIO(file_res.content))
-    except Exception as e:
-        st.error(f"Ошибка чтения с Яндекс Диска: {e}")
+    except:
         return pd.DataFrame()
 
 def upload_to_yandex(df):
-    """Загружает обновленный Excel файл обратно на Яндекс Диск"""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
@@ -51,12 +46,10 @@ def upload_to_yandex(df):
             if put_res.status_code in:
                 return True
         return False
-    except Exception as e:
-        st.error(f"Ошибка сохранения на Яндекс Диск: {e}")
+    except:
         return False
 
 def init_db():
-    """Проверяем доступность и создаем файл в облаке, если его еще нет"""
     df = download_from_yandex()
     if df.empty:
         empty_df = pd.DataFrame(columns=[
@@ -67,13 +60,11 @@ def init_db():
         upload_to_yandex(empty_df)
 
 def add_recipient(data_dict):
-    """Добавляет новую запись в облачную таблицу Яндекса"""
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
         data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
         
     df = download_from_yandex()
     
-    # Проверка на дубликат по серии и номеру паспорта (если они заполнены)
     if not df.empty and 'passport_series' in df.columns and 'passport_number' in df.columns:
         duplicate = df[
             (df['passport_series'].astype(str) == str(data_dict.get('passport_series'))) & 
@@ -81,7 +72,7 @@ def add_recipient(data_dict):
             (df['passport_number'].astype(str) != "0000")
         ]
         if not duplicate.empty and not str(data_dict.get('passport_number')).startswith("б/н"):
-            return False  # Дубликат найден
+            return False
 
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
@@ -105,7 +96,6 @@ def get_weekday_name(date_str):
         return "Не определен"
 
 def show_admin_panel():
-    """Отрисовка архива, аналитики и карты в tab2"""
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
     
     if st.button("🔄 Обновить данные из облака"):
@@ -160,10 +150,10 @@ def show_admin_panel():
 
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
-    filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+    if 'visit_date_parsed' in filtered_df.columns:
+        filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
     filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
 
-    # Сохраняем в сессию, чтобы карта подхватывала данные
     st.session_state.shelter_records = filtered_df
 
     st.write("---")
