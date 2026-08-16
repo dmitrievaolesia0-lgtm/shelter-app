@@ -1,40 +1,52 @@
-import streamlit as st
+import sqlite3
 import pandas as pd
-from datetime import datetime
+import streamlit as st
+from datetime import datetime, date
+
+DB_NAME = "shelter_data.db"
 
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
+    3: "4. Четверг", 4: "5. Пятница", 5: "6. Соббота", 6: "7. Воскресенье"
 }
 
 def init_db():
-    """Инициализирует защищенную базу данных в памяти сессии Streamlit."""
-    if "shelter_records" not in st.session_state:
-        # Создаем пустой датафрейм со всеми нужными колонками
-        st.session_state.shelter_records = pd.DataFrame(columns=[
-            "fio", "birth_date", "passport_series", "passport_number",
-            "passport_date", "passport_code", "phone", "district",
-            "vk_link", "address", "feed_type", "photo_path", "visit_date"
-        ])
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recipients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fio TEXT, birth_date TEXT, passport_series TEXT, passport_number TEXT,
+            passport_date TEXT, passport_code TEXT, phone TEXT, district TEXT,
+            vk_link TEXT, address TEXT, feed_type TEXT, photo_path TEXT, visit_date TEXT,
+            UNIQUE(passport_series, passport_number)
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 def add_recipient(data_dict):
-    """Сохраняет запись во внутреннюю синхронизированную базу данных."""
     init_db()
-    df = st.session_state.shelter_records
-    
-    # Проверка на дубликаты по номеру паспорта
-    if data_dict['passport_series'] != "0000":
-        duplicate = df[
-            (df['passport_series'].astype(str) == str(data_dict['passport_series'])) & 
-            (df['passport_number'].astype(str) == str(data_dict['passport_number']))
-        ]
-        if not duplicate.empty:
-            return False
-            
-    # Добавляем строку в общую память
-    new_row = pd.DataFrame([data_dict])
-    st.session_state.shelter_records = pd.concat([df, new_row], ignore_index=True)
-    return True
+    if 'visit_date' not in data_dict or not data_dict['visit_date']:
+        data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
+        
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO recipients (fio, birth_date, passport_series, passport_number, 
+                                    passport_date, passport_code, phone, district, 
+                                    vk_link, address, feed_type, photo_path, visit_date)
+            VALUES (:fio, :birth_date, :passport_series, :passport_number, 
+                    :passport_date, :passport_code, :phone, :district, 
+                    :vk_link, :address, :feed_type, :photo_path, :visit_date)
+        """, data_dict)
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
 
 def calculate_age(birth_date_str):
     try:
@@ -54,19 +66,13 @@ def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА")
     init_db()
     
-    df = st.session_state.shelter_records
+    conn = sqlite3.connect(DB_NAME)
+    df = pd.read_sql_query("SELECT * FROM recipients", conn)
+    conn.close()
 
-    if df.empty or len(df) == 0:
-        st.info("Архив базы данных пуст.")
-        return
-
-    # Генерация аналитических колонок
-    df['Возраст'] = df['birth_date'].apply(calculate_age)
-    df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
-
+    # Фильтры и сортировки показываем всегда, даже если данных пока 0
     search_fio = st.text_input("Поиск (ФИО / телефон)", placeholder="Введите текст...")
     
-    # --- МУЛЬТИВЫБОР ВСЕХ ОФИЦИАЛЬНЫХ РАЙОНОВ БАРНАУЛА ---
     all_barnaul_districts = [
         "Железнодорожный", 
         "Индустриальный", 
@@ -82,8 +88,12 @@ def show_admin_panel():
         default=[]
     )
 
-    df['visit_date_parsed'] = pd.to_datetime(df['visit_date']).dt.date
-    min_date, max_value = df['visit_date_parsed'].min(), df['visit_date_parsed'].max()
+    if not df.empty:
+        df['visit_date_parsed'] = pd.to_datetime(df['visit_date']).dt.date
+        min_date, max_value = df['visit_date_parsed'].min(), df['visit_date_parsed'].max()
+    else:
+        min_date, max_value = date.today(), date.today()
+
     date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
 
     sort_options = {
@@ -96,12 +106,18 @@ def show_admin_panel():
     }
     selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
 
-    # --- СТРОГАЯ ФИЛЬТРАЦИЯ ДАННЫХ ---
+    if df.empty or len(df) == 0:
+        st.write("---")
+        st.info("В базе данных пока нет сохраненных записей. Добавьте первую запись на вкладке 'Ввод данных'.")
+        return
+
+    df['Возраст'] = df['birth_date'].apply(calculate_age)
+    df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
+
     filtered_df = df.copy()
     if search_fio:
         filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False) | filtered_df['phone'].astype(str).str.contains(search_fio, na=False)]
     
-    # Фильтрация по мультивыбору районов Барнаула
     if selected_districts:
         filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
         
@@ -109,7 +125,6 @@ def show_admin_panel():
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
 
-    # Применение выбранной сортировки
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
     filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
@@ -118,7 +133,6 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(filtered_df)}")
 
-    # Вывод карточек получателей по клику
     for index, row in filtered_df.iterrows():
         with st.expander(f"👤 {row['fio']} | {row['district']} район"):
             st.markdown(f"**Контакты:** {row['phone']}")
@@ -139,8 +153,8 @@ def show_admin_panel():
             if "Человек:" in str(row['photo_path']):
                 try:
                     parts = str(row['photo_path']).split(" | ")
-                    p_url = parts[0].replace("Человек: ", "")
-                    r_url = parts[1].replace("Расписка: ", "")
+                    p_url = parts.replace("Человек: ", "")
+                    r_url = parts.replace("Расписка: ", "")
                     
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
                     st.link_button("Просмотреть фото расписки", r_url, use_container_width=True)
