@@ -1,131 +1,150 @@
-import sqlite3
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import requests
+import io
+import urllib.parse
 from datetime import datetime, date
 
-DB_NAME = "shelter_data.db"
+# --- НАСТРОЙКИ ЯНДЕКСА ---
+# Безопасно берем токен из секретов Streamlit или вставляй строку из Полигона
+YANDEX_TOKEN = st.secrets.get("YANDEX_TOKEN", "ВАШ_OAUTH_ТОКЕН_ИЗ_ПОЛИГОНА")
+FILE_PATH_ON_DISK = "shelter_base.xlsx"  # Имя файла-таблицы на твоем Яндекс.Диске
 
-# Исправлена опечатка в слове "Суббота"
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
     3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
 }
 
+def download_from_yandex():
+    """Скачивает Excel файл с Яндекс Диска в память"""
+    url = f"https://yandex.net{FILE_PATH_ON_DISK}"
+    headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
+    try:
+        res = requests.get(url, headers=headers).json()
+        download_url = res.get("href")
+        if not download_url:
+            return pd.DataFrame(columns=[
+                'fio', 'birth_date', 'passport_series', 'passport_number',
+                'passport_date', 'passport_code', 'phone', 'district',
+                'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
+            ])
+        file_res = requests.get(download_url)
+        return pd.read_excel(io.BytesIO(file_res.content))
+    except Exception as e:
+        st.error(f"Ошибка чтения с Яндекс Диска: {e}")
+        return pd.DataFrame()
+
+def upload_to_yandex(df):
+    """Загружает обновленный Excel файл обратно на Яндекс Диск"""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    output.seek(0)
+    
+    url = f"https://yandex.net{FILE_PATH_ON_DISK}&overwrite=true"
+    headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
+    try:
+        res = requests.get(url, headers=headers).json()
+        upload_url = res.get("href")
+        if upload_url:
+            put_res = requests.put(upload_url, data=output.getvalue())
+            if put_res.status_code in:
+                return True
+        return False
+    except Exception as e:
+        st.error(f"Ошибка сохранения на Яндекс Диск: {e}")
+        return False
+
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recipients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fio TEXT, birth_date TEXT, passport_series TEXT, passport_number TEXT,
-            passport_date TEXT, passport_code TEXT, phone TEXT, district TEXT,
-            vk_link TEXT, address TEXT, feed_type TEXT, photo_path TEXT, visit_date TEXT,
-            UNIQUE(passport_series, passport_number)
-        )
-    """)
-    conn.commit()
-    conn.close()
+    """Проверяем доступность и создаем файл в облаке, если его еще нет"""
+    df = download_from_yandex()
+    if df.empty:
+        empty_df = pd.DataFrame(columns=[
+            'fio', 'birth_date', 'passport_series', 'passport_number',
+            'passport_date', 'passport_code', 'phone', 'district',
+            'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
+        ])
+        upload_to_yandex(empty_df)
 
 def add_recipient(data_dict):
-    init_db()
+    """Добавляет новую запись в облачную таблицу Яндекса"""
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
         data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
         
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            INSERT INTO recipients (fio, birth_date, passport_series, passport_number, 
-                                    passport_date, passport_code, phone, district, 
-                                    vk_link, address, feed_type, photo_path, visit_date)
-            VALUES (:fio, :birth_date, :passport_series, :passport_number, 
-                    :passport_date, :passport_code, :phone, :district, 
-                    :vk_link, :address, :feed_type, :photo_path, :visit_date)
-        """, data_dict)
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
+    df = download_from_yandex()
+    
+    # Проверка на дубликат по серии и номеру паспорта (если они заполнены)
+    if not df.empty and 'passport_series' in df.columns and 'passport_number' in df.columns:
+        duplicate = df[
+            (df['passport_series'].astype(str) == str(data_dict.get('passport_series'))) & 
+            (df['passport_number'].astype(str) == str(data_dict.get('passport_number'))) &
+            (df['passport_number'].astype(str) != "0000")
+        ]
+        if not duplicate.empty and not str(data_dict.get('passport_number')).startswith("б/н"):
+            return False  # Дубликат найден
+
+    new_row_df = pd.DataFrame([data_dict])
+    updated_df = pd.concat([df, new_row_df], ignore_index=True)
+    return upload_to_yandex(updated_df)
 
 def calculate_age(birth_date_str):
     try:
-        if not birth_date_str or birth_date_str == "Не указана": 
+        if not birth_date_str or pd.isna(birth_date_str) or birth_date_str == "Не указана": 
             return 999
-        bd = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+        bd = pd.to_datetime(birth_date_str).date()
         today = datetime.today().date()
         return today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
-    except Exception: 
+    except: 
         return 999
 
 def get_weekday_name(date_str):
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        dt = pd.to_datetime(date_str)
         return WEEKDAYS_RU[dt.weekday()]
-    except Exception: 
+    except: 
         return "Не определен"
 
 def show_admin_panel():
-    st.caption("АРХИВ И АНАЛИТИКА")
-    init_db()
+    """Отрисовка архива, аналитики и карты в tab2"""
+    st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
     
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT * FROM recipients", conn)
-    conn.close()
-
+    if st.button("🔄 Обновить данные из облака"):
+        st.rerun()
+        
+    df = download_from_yandex()
+    
     search_fio = st.text_input("Поиск (ФИО / телефон)", placeholder="Введите текст...")
-    
-    all_barnaul_districts = [
-        "Железнодорожный", 
-        "Индустриальный", 
-        "Ленинский", 
-        "Октябрьский", 
-        "Центральный", 
-        "Не определен"
-    ]
-    
-    selected_districts = st.multiselect(
-        "Фильтр по районам города (оставьте пустым для выбора всех районов)", 
-        options=all_barnaul_districts,
-        default=[]
-    )
+    all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
+    selected_districts = st.multiselect("Фильтр по районам города", options=all_barnaul_districts, default=[])
 
-    # Безопасная инициализация календаря, если база пуста
-    if not df.empty and len(df) > 0:
-        df['visit_date_parsed'] = pd.to_datetime(df['visit_date']).dt.date
-        min_date = df['visit_date_parsed'].min()
-        max_value = df['visit_date_parsed'].max()
-        # Защита от случая, когда все даты в БД — это один и тот же день
-        if min_date == max_value:
-            date_range = st.date_input("Период посещения", value=(min_date, max_value))
-        else:
-            date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
+    if not df.empty and 'visit_date' in df.columns:
+        df['visit_date_parsed'] = pd.to_datetime(df['visit_date'], errors='coerce').dt.date
+        min_date, max_value = df['visit_date_parsed'].min(), df['visit_date_parsed'].max()
+        if pd.isna(min_date): min_date = date.today()
+        if pd.isna(max_value): max_value = date.today()
     else:
-        min_date = date.today()
-        # Если данных нет, не передаем min/max ограничения, чтобы календарь не блокировался
-        date_range = st.date_input("Период посещения", value=(min_date, min_date))
+        min_date, max_value = date.today(), date.today()
+
+    date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
 
     sort_options = {
         "Сначала новые визиты": ("visit_date", False),
         "Сначала старые визиты": ("visit_date", True),
         "По районам города (А-Я)": ("district", True),
-        "По дням недели визита (Пн-Вс)": ("День недели визита", True),
-        "От старших к младшим (Возраст)": ("Возраст", False),  # Исправлено на False (от старших к младшим)
+        "От старших к младшим (Возраст)": ("Возраст", True),
         "По алфавиту (ФИО)": ("fio", True)
     }
     selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
 
     if df.empty or len(df) == 0:
         st.write("---")
-        st.info("В базе данных пока нет сохраненных записей. Добавьте первую запись на вкладке 'Ввод данных'.")
+        st.info("Архив базы данных пуст.")
         return
 
     df['Возраст'] = df['birth_date'].apply(calculate_age)
     df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
 
     filtered_df = df.copy()
-    
     if search_fio:
         filtered_df = filtered_df[
             filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False) | 
@@ -135,54 +154,46 @@ def show_admin_panel():
     if selected_districts:
         filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
         
-    # Корректная обработка фильтра дат (учитывает и одиночную дату, и кортеж)
-    if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
+    if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
-    elif isinstance(date_range, date):
-        filtered_df = filtered_df[filtered_df['visit_date_parsed'] == date_range]
 
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
-    
-    if 'visit_date_parsed' in filtered_df.columns:
-        filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
-        
+    filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
     filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
+
+    # Сохраняем в сессию, чтобы карта подхватывала данные
+    st.session_state.shelter_records = filtered_df
 
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(filtered_df)}")
 
     for index, row in filtered_df.iterrows():
-        with st.expander(f"👤 {row['fio']} | {row['district']} район"):
-            st.markdown(f"**Контакты:** {row['phone']}")
-            st.markdown(f"**Дата визита:** {row['visit_date']}")
+        with st.expander(f"👤 {row.get('fio', 'Без имени')} | {row.get('district', 'Не определен')} район"):
+            st.markdown(f"**Контакты:** {row.get('phone', '-')}")
+            st.markdown(f"**Дата визита:** {row.get('visit_date', '-')}")
             
             st.write("---")
             st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
-            st.text(f"Возраст: {row['Возраст']} (д.р. {row['birth_date']})")
-            st.text(f"Адрес: {row['address']}")
-            st.text(f"Выданный корм: {row['feed_type']}")
-            st.text(f"Паспорт: {row['passport_series']} {row['passport_number']}")
+            st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
+            st.text(f"Адрес: {row.get('address', '-')}")
+            st.text(f"Выданный корм: {row.get('feed_type', '-')}")
+            st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
             
             st.write("---")
-            st.caption("ССЫЛКИ НА МАТЕРИАЛЫ В ВК")
-            if row['vk_link'] and row['vk_link'] != "Не указана":
-                st.link_button("Личный профиль ВК", str(row['vk_link']), use_container_width=True)
+            st.caption("ССЫЛКИ НА МАТЕРИАЛЫ")
+            vk = row.get('vk_link', '')
+            if vk and vk != "Не указана":
+                st.link_button("Личный профиль ВК", str(vk), use_container_width=True)
                 
-            # Исправленный разбор строки с путями фото получателя и расписки
-            photo_path_str = str(row['photo_path'])
-            if "Человек:" in photo_path_str and "Расписка:" in photo_path_str:
+            p_path = str(row.get('photo_path', ''))
+            if "Человек:" in p_path:
                 try:
-                    parts = photo_path_str.split(" | ")
-                    # Извлекаем чистые ссылки из элементов списка
+                    parts = p_path.split(" | ")
                     p_url = parts[0].replace("Человек: ", "").strip()
                     r_url = parts[1].replace("Расписка: ", "").strip()
-                    
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
                     st.link_button("Просмотреть фото расписки", r_url, use_container_width=True)
-                except Exception:
-                    st.text(f"Ссылки: {photo_path_str}")
-            else:
-                if photo_path_str and photo_path_str != "None" and photo_path_str != "Не указана":
-                    st.text(f"Ссылки: {photo_path_str}")
+                except:
+                    st.text(f"Ссылки: {p_path}")
