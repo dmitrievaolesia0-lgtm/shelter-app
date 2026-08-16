@@ -52,7 +52,8 @@ def show_admin_panel():
     # 2. РАЗДЕЛЬНЫЙ ПОИСК
     col1, col2 = st.columns(2)
     with col1:
-        search_last_name = st.text_input("Поиск по фамилии", placeholder="Иванов...")
+        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...")
+
     with col2:
         search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...")
 
@@ -85,8 +86,9 @@ def show_admin_panel():
     # Применение фильтров
     filtered_df = df.copy()
     
-    if search_last_name:
-        filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_last_name, case=False, na=False)]
+    if search_fio:
+    filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False)]
+
         
     if search_phone:
         filtered_df = filtered_df[filtered_df['phone'].astype(str).str.contains(search_phone, na=False)]
