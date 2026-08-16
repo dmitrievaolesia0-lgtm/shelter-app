@@ -4,3 +4,6 @@ requests
 openpyxl
 yadisk
 plotly 
+folium
+streamlit-folium
+
