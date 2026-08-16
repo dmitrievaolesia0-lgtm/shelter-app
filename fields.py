@@ -23,15 +23,15 @@ def get_user_inputs():
         <style>
         [data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
-            gap: 10px !important;
+            gap: 15px !important;
         }
         [data-testid="column"] {
             width: 30% !important;
             flex: 1 1 30% !important;
-            min-width: 30% !important;
+            min-width: 60px !important;
         }
         button p {
-            font-size: 24px !important; /* Делаем цифры внутри кнопок очень крупными */
+            font-size: 20px !important; /* Делаем цифры внутри кнопок очень крупными */
             font-weight: bold !important;
         }
         </style>
