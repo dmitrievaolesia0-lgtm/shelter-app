@@ -121,8 +121,9 @@ def show_admin_panel():
             current_district = row.get('district', 'Не определен')
             if not current_district or pd.isna(current_district):
                 current_district = "Не определен"
-                
-            with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{current_district}]"):
+             current_phone = row.get('phone', '-')
+            
+            with st.expander(f"👤 {row.get('fio', 'Без имени')} | 📞 {current_phone} | [{current_district}]"):
                 # 1. КОНТАКТЫ (Кликабельный номер)
                 callable_phone = analytics.make_phone_callable(row.get('phone', '-'))
                 st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
