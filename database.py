@@ -64,7 +64,11 @@ def add_recipient(data_dict):
         
     df = download_from_yandex()
     
-    # Жесткая очистка: если таблица пустая или в ней нет нужных колонок, сразу сохраняем
+    # ЖЕСТКАЯ ОЧИСТКА: Удаляем из таблицы строки, где ФИО или Телефон пустые (NaN)
+    if not df.empty:
+        df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
+    
+    # Если после очистки скрытого мусора таблица пустая — сразу сохраняем
     if df.empty or 'fio' not in df.columns or 'phone' not in df.columns:
         new_row_df = pd.DataFrame([data_dict])
         return upload_to_yandex(new_row_df)
@@ -72,19 +76,16 @@ def add_recipient(data_dict):
     curr_fio = str(data_dict.get('fio', '')).strip().lower()
     curr_phone = str(data_dict.get('phone', '')).strip().lower()
     
-    # Проверяем дубликат только если ФИО и телефон реально заполнены
-    if curr_fio and curr_phone:
-        # Удаляем пустые ячейки (NaN) перед сравнением строк
-        temp_df = df.dropna(subset=['fio', 'phone']).copy()
-        if not temp_df.empty:
-            db_fio = temp_df['fio'].astype(str).str.strip().str.lower()
-            db_phone = temp_df['phone'].astype(str).str.strip().str.lower()
-            
-            duplicate = temp_df[(db_fio == curr_fio) & (db_phone == curr_phone)]
-            if not duplicate.empty:
-                return False  # Настоящий дубликат найден, блокируем
+    # Проверяем на дубликат только среди РЕАЛЬНО ЗАПОЛНЕННЫХ строк базы
+    if curr_fio and curr_phone and curr_fio != "nan" and curr_phone != "nan":
+        db_fio = df['fio'].astype(str).str.strip().str.lower()
+        db_phone = df['phone'].astype(str).str.strip().str.lower()
+        
+        duplicate = df[(db_fio == curr_fio) & (db_phone == curr_phone)]
+        if not duplicate.empty:
+            return False  # Запрет только если совпали реальный человек и реальный телефон
 
-    # Если дубликатов нет — добавляем новую запись и сохраняем в облако
+    # Добавляем новую запись в чистую таблицу
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
     return upload_to_yandex(updated_df)
@@ -114,6 +115,10 @@ def show_admin_panel():
         
     df = download_from_yandex()
     
+    # Перед отображением в админке тоже убираем пустые строки NaN
+    if not df.empty:
+        df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
+        
     search_fio = st.text_input("Поиск (ФИО / телефон)", placeholder="Введите текст...")
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     selected_districts = st.multiselect("Фильтр по районам города", options=all_barnaul_districts, default=[])
