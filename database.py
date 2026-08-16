@@ -14,7 +14,6 @@ WEEKDAYS_RU = {
 }
 
 def download_from_yandex():
-    # Исправлен URL на официальный API Яндекс.Диска
     url = f"https://yandex.net{FILE_PATH_ON_DISK}"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -37,7 +36,6 @@ def upload_to_yandex(df):
         df.to_excel(writer, index=False)
     output.seek(0)
     
-    # Исправлен запрос ссылки для загрузки с флагом overwrite=true
     url = f"https://yandex.net{FILE_PATH_ON_DISK}&overwrite=true"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -45,7 +43,6 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # Исправлена синтаксическая ошибка "in:" -> "in"
             if put_res.status_code in:
                 return True
         return False
@@ -118,7 +115,6 @@ def show_admin_panel():
     else:
         min_date, max_value = date.today(), date.today()
 
-    # Защита от багов разметки дат в Streamlit
     if min_date > max_value:
         min_date = max_value
 
@@ -188,6 +184,7 @@ def show_admin_panel():
             if "Человек:" in p_path:
                 try:
                     parts = p_path.split(" | ")
+                    # ИСПРАВЛЕНО: возвращены правильные индексы [0] и [1]
                     p_url = parts[0].replace("Человек: ", "").strip()
                     r_url = parts[1].replace("Расписка: ", "").strip()
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
