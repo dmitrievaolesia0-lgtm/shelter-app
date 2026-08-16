@@ -1,100 +1,52 @@
 import streamlit as st
 import pandas as pd
-import requests
-import io
 from datetime import datetime, date
-
-YANDEX_TOKEN = st.secrets.get("YANDEX_TOKEN", "")
-FILE_PATH_ON_DISK = "shelter_base.xlsx"
+import yandex_cloud as cloud  # Подключаем наш первый файл
 
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
+    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
 }
 
-def download_from_yandex():
-    url = f"https://yandex.net{FILE_PATH_ON_DISK}"
-    headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
-    empty_template = pd.DataFrame(columns=[
-        'fio', 'birth_date', 'passport_series', 'passport_number',
-        'passport_date', 'passport_code', 'phone', 'district',
-        'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
-    ])
-    try:
-        res = requests.get(url, headers=headers).json()
-        download_url = res.get("href")
-        if not download_url:
-            return empty_template
-        file_res = requests.get(download_url)
-        if file_res.status_code == 200:
-            return pd.read_excel(io.BytesIO(file_res.content))
-        return empty_template
-    except:
-        return empty_template
-
-def upload_to_yandex(df):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
-    output.seek(0)
-    
-    url = f"https://yandex.net{FILE_PATH_ON_DISK}&overwrite=true"
-    headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
-    try:
-        res = requests.get(url, headers=headers).json()
-        upload_url = res.get("href")
-        if upload_url:
-            put_res = requests.put(upload_url, data=output.getvalue())
-            # ИСПРАВЛЕНО: Указаны точные коды успешного ответа 200 и 201
-            if put_res.status_code in:
-                return True
-            else:
-                st.error(f"Яндекс.Диск отклонил запись. Код: {put_res.status_code}")
-        else:
-            st.error("Не удалось получить ссылку для загрузки от Яндекс.Диска.")
-        return False
-    except Exception as e:
-        st.error(f"Ошибка загрузки: {str(e)}")
-        return False
-
 def init_db():
-    df = download_from_yandex()
+    df = cloud.download_from_yandex()
+    # Если файла на Яндекс.Диске нет или он пустой — создаем его с правильной структурой
     if df.empty or len(df) == 0:
-        empty_df = pd.DataFrame(columns=[
-            'fio', 'birth_date', 'passport_series', 'passport_number',
-            'passport_date', 'passport_code', 'phone', 'district',
-            'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
-        ])
-        upload_to_yandex(empty_df)
+        empty_df = cloud.get_empty_template()
+        cloud.upload_to_yandex(empty_df)
 
 def add_recipient(data_dict):
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
         data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
         
-    df = download_from_yandex()
+    df = cloud.download_from_yandex()
     
-    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
+    # Полностью очищаем базу от возможных пустых строк (NaN), которые создает Excel
+    if not df.empty:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
     
-    if df.empty or len(df) == 0 or 'fio' not in df.columns:
+    # Если база пустая — никакие дубликаты физически не проверяем, сразу сохраняем!
+    if df.empty or len(df) == 0:
         new_row_df = pd.DataFrame([data_dict])
-        return upload_to_yandex(new_row_df)
+        return cloud.upload_to_yandex(new_row_df)
         
     curr_fio = str(data_dict.get('fio', '')).strip().lower()
     curr_phone = str(data_dict.get('phone', '')).strip().lower()
     
+    # Проверка на дубликат строго по ФИО + Номер телефона
     if curr_fio and curr_phone:
         db_fio = df['fio'].astype(str).str.strip().str.lower()
         db_phone = df['phone'].astype(str).str.strip().str.lower()
         
         duplicate = df[(db_fio == curr_fio) & (db_phone == curr_phone)]
         if not duplicate.empty:
-            st.warning("Этот человек уже есть в базе.")
+            st.warning("⚠️ Этот человек с таким номером телефона уже зарегистрирован в базе.")
             return False
 
+    # Если дубликатов нет, добавляем строку к очищенной таблице и загружаем
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
-    return upload_to_yandex(updated_df)
+    return cloud.upload_to_yandex(updated_df)
 
 def calculate_age(birth_date_str):
     try:
@@ -118,7 +70,7 @@ def show_admin_panel():
     if st.button("🔄 Обновить данные из облака"):
         st.rerun()
         
-    df = download_from_yandex()
+    df = cloud.download_from_yandex()
     if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
         
