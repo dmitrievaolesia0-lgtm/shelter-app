@@ -1,9 +1,20 @@
 import sqlite3
 import pandas as pd
 import streamlit as st
-from datetime import datetime, date
+from datetime import datetime
 
 DB_NAME = "shelter_data.db"
+
+# Словарь для перевода дней недели на русский язык
+WEEKDAYS_RU = {
+    0: "1. Понедельник",
+    1: "2. Вторник",
+    2: "3. Среда",
+    3: "4. Четверг",
+    4: "5. Пятница",
+    5: "6. Суббота",
+    6: "7. Воскресенье"
+}
 
 def init_db():
     """Создает базу данных и таблицу с учетом даты выдачи корма."""
@@ -24,7 +35,7 @@ def init_db():
             address TEXT,
             feed_type TEXT,
             photo_path TEXT,
-            visit_date TEXT, -- Автоматическая дата получения корма
+            visit_date TEXT,
             UNIQUE(passport_series, passport_number)
         )
     """)
@@ -32,7 +43,7 @@ def init_db():
     conn.close()
 
 def add_recipient(data_dict):
-    """Добавляет запись. Если visit_date не передан, ставит сегодняшнюю дату."""
+    """Добавляет запись в базу данных."""
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
         data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
         
@@ -54,8 +65,27 @@ def add_recipient(data_dict):
     finally:
         conn.close()
 
+def calculate_age(birth_date_str):
+    """Вычисляет возраст на основе строки даты (ГГГГ-ММ-ДД)."""
+    try:
+        if not birth_date_str or birth_date_str == "Не указана":
+            return 999
+        bd = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+        today = datetime.today().date()
+        return today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+    except Exception:
+        return 999
+
+def get_weekday_name(date_str):
+    """Определяет день недели по дате."""
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return WEEKDAYS_RU[dt.weekday()]
+    except Exception:
+        return "Не определен"
+
 def show_admin_panel():
-    """Отображает панель с фильтрами по району, поиску и ДАТЕ ВИЗИТА."""
+    """Отображает панель с продвинутой фильтрацией и сортировкой для телефона."""
     st.title("🗂️ База данных приюта")
 
     init_db()
@@ -67,45 +97,39 @@ def show_admin_panel():
         st.info("База данных пока пуста.")
         return
 
+    # Добавляем виртуальные столбцы для продвинутой сортировки
+    df['Возраст'] = df['birth_date'].apply(calculate_age)
+    df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
+
     st.subheader("🔍 Фильтрация, поиск и сортировка")
     
-    # Поиск по тексту и району
     search_fio = st.text_input("Поиск по ФИО или телефону")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        districts = ["Все"] + list(df["district"].unique())
-        selected_district = st.selectbox("Фильтр по району", districts)
-        
-    with col2:
-        sort_options = {
-            "Сначала новые визиты": ("visit_date", False),
-            "Сначала старые визиты": ("visit_date", True),
-            "По алфавиту (ФИО)": ("fio", True),
-        }
-        selected_sort = st.selectbox("Сортировка данных", list(sort_options.keys()))
+    districts = ["Все"] + list(df["district"].unique())
+    selected_district = st.selectbox("Фильтр по району", districts)
 
-    # --- НОВЫЙ БЛОК: Фильтр по датам посещения ---
+    # Календарный фильтр периодов визитов
     st.write("---")
-    st.markdown("**📅 Выберите период посещения приюта:**")
-    
-    # Превращаем текстовые даты из базы данных в формат дат для календаря Pandas
+    st.markdown("**📅 Выберите период посещения:**")
     df['visit_date_parsed'] = pd.to_datetime(df['visit_date']).dt.date
+    min_date, max_date = df['visit_date_parsed'].min(), df['visit_date_parsed'].max()
     
-    min_date = df['visit_date_parsed'].min()
-    max_date = df['visit_date_parsed'].max()
-    
-    # Календарь-слайдер для выбора диапазона (например, с 01.08 по 16.08)
-    date_range = st.date_input(
-        "Диапазон дат",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date,
-        key="visit_filter_range"
-    )
-    st.write("---")
+    date_range = st.date_input("Диапазон дат визитов", value=(min_date, max_date), min_value=min_date, max_value=max_date)
 
-    # Применение текстовых фильтров
+    # Выбор расширенной сортировки (Добавили сортировку по районам!)
+    st.write("---")
+    sort_options = {
+        "Сначала новые визиты ⏳": ("visit_date", False),
+        "Сначала старые визиты ⌛": ("visit_date", True),
+        "По районам города (А-Я) 🏙️": ("district", True), # <-- НОВОЕ Поле сортировки!
+        "По дням недели визита (Пн-Вс) 🗓️": ("День недели визита", True),
+        "От старших к младшим (Возраст ↓) 👴": ("Возраст", True),
+        "От младших к старшим (Возраст ↑) 👶": ("Возраст", False),
+        "По алфавиту (ФИО) 🔤": ("fio", True)
+    }
+    selected_sort = st.selectbox("📊 Выберите тип сортировки списка:", list(sort_options.keys()))
+
+    # --- ПРИМЕНЕНИЕ ФИЛЬТРОВ ---
     filtered_df = df.copy()
     if search_fio:
         filtered_df = filtered_df[
@@ -115,20 +139,17 @@ def show_admin_panel():
     if selected_district != "Все":
         filtered_df = filtered_df[filtered_df['district'] == selected_district]
 
-    # Применение фильтра по датам (проверяем, выбрал ли пользователь одну дату или диапазон)
     if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
-        filtered_df = filtered_df[
-            (filtered_df['visit_date_parsed'] >= start_date) & 
-            (filtered_df['visit_date_parsed'] <= end_date)
-        ]
+        filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
 
-    # Применение сортировки
+    # --- ПРИМЕНЕНИЕ СОРТИРОВКИ ---
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
 
-    # Удаляем временную колонку перед показом пользователю
+    # Очищаем датафрейм от вспомогательных служебных колонок
     filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+    filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
 
     st.subheader(f"📋 Найдено записей: {len(filtered_df)} из {len(df)}")
     st.dataframe(filtered_df, use_container_width=True)
