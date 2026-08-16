@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
 import re
 from datetime import datetime, date
 
@@ -8,26 +7,23 @@ import database as db
 import date_picker as dp
 import map_barnaul as mb
 
-# Строгая настройка страницы
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
 db.init_db()
 
 st.subheader("Регистрация и учет выдачи корма")
 
-# Минималистичные вкладки
 tab1, tab2 = st.tabs(["Ввод данных", "Архив и аналитика"])
 
 with tab1:
     st.caption("ОБЯЗАТЕЛЬНЫЕ ДАННЫЕ")
     
-    # Компактные поля ввода ФИО
     last_name = st.text_input("Фамилия *", placeholder="Иванов")
     first_name = st.text_input("Имя *", placeholder="Иван")
     middle_name = st.text_input("Отчество *", placeholder="Иванович")
     
     district = st.selectbox(
         "Район проживания в Барнауле *", 
-        ["ИндустриАльный", "Ленинский", "Железнодорожный", "Октябрьский", "Центральный", "Не определен"]
+        ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     )
     
     visit_date_selected = st.date_input(
@@ -36,7 +32,6 @@ with tab1:
         max_value=date.today()
     )
     
-    # Строгий блок ввода телефона
     st.write("---")
     st.caption("КОНТАКТНЫЕ ДАННЫЕ")
     
@@ -77,13 +72,11 @@ with tab1:
             phone_error = "НЕ_ЗАПОЛНЕН"
             final_phone = ""
 
-    # Строгий блок фотофиксации
     st.write("---")
     st.caption("ФОТОФИКСАЦИЯ ВЫДАЧИ")
     photo_person_link = st.text_input("Ссылка на фото получателя *", placeholder="https://vk.com...")
     photo_receipt_link = st.text_input("Ссылка на фото расписки *", placeholder="https://vk.com...")
     
-    # Строгий блок дополнительных данных
     st.write("---")
     st.caption("ДОПОЛНИТЕЛЬНЫЕ ДАННЫЕ (НЕОБЯЗАТЕЛЬНО)")
     
@@ -102,23 +95,15 @@ with tab1:
     
     st.write("---")
     if st.button("СОХРАНИТЬ ЗАПИСЬ", type="primary", use_container_width=True):
-        if not last_name.strip():
-            st.error("Укажите фамилию")
-        elif not first_name.strip():
-            st.error("Укажите имя")
-        elif not middle_name.strip():
-            st.error("Укажите отчество")
-        elif phone_error == "НЕ_ЗАПОЛНЕН":
-            st.error("Укажите номер телефона")
-        elif phone_error == "ОШИБКА_ДЛИНЫ":
-            st.error("Длина стандартного номера должна составлять 10 цифр")
-        elif not photo_person_link.strip():
-            st.error("Укажите ссылку на фото получателя")
-        elif not photo_receipt_link.strip():
-            st.error("Укажите ссылку на фото расписки")
+        if not last_name.strip(): st.error("Укажите фамилию")
+        elif not first_name.strip(): st.error("Укажите имя")
+        elif not middle_name.strip(): st.error("Укажите отчество")
+        elif phone_error == "НЕ_ЗАПОЛНЕН": st.error("Укажите номер телефона")
+        elif phone_error == "ОШИБКА_ДЛИНЫ": st.error("Длина стандартного номера должна составлять 10 цифр")
+        elif not photo_person_link.strip(): st.error("Укажите ссылку на фото получателя")
+        elif not photo_receipt_link.strip(): st.error("Укажите ссылку на фото расписки")
         else:
             full_fio = f"{last_name.strip()} {first_name.strip()} {middle_name.strip()}"
-            
             final_series = p_series.strip() if p_series.strip() else "0000"
             final_number = p_number.strip() if p_number.strip() else f"б/н-{int(datetime.timestamp(datetime.now()))}"
             visit_date_str = visit_date_selected.strftime('%Y-%m-%d')
@@ -126,19 +111,15 @@ with tab1:
             combined_photos = f"Человек: {photo_person_link.strip()} | Расписка: {photo_receipt_link.strip()}"
             
             new_record = {
-                "fio": full_fio,
-                "birth_date": birth_date_str if birth_date_str else "Не указана",
-                "passport_series": final_series,
-                "passport_number": final_number,
+                "fio": full_fio, "birth_date": birth_date_str if birth_date_str else "Не указана",
+                "passport_series": final_series, "passport_number": final_number,
                 "passport_date": p_date.strip() if p_date.strip() else "Не указана",
                 "passport_code": p_code.strip() if p_code.strip() else "Не указан",
-                "phone": final_phone,
-                "district": district,
+                "phone": final_phone, "district": district,
                 "vk_link": vk_link.strip() if vk_link.strip() else "Не указана",
                 "address": address.strip() if address.strip() else "Не указан",
                 "feed_type": feed_type.strip() if feed_type.strip() else "Не указан",
-                "photo_path": combined_photos,
-                "visit_date": visit_date_str
+                "photo_path": combined_photos, "visit_date": visit_date_str
             }
             
             success = db.add_recipient(new_record)
@@ -146,12 +127,12 @@ with tab1:
                 st.success(f"Запись успешно сохранена: {full_fio}")
                 st.rerun()
             else:
-                st.error("Ошибка сохранения: обнаружен дубликат данных или сбой БД")
+                st.error("Ошибка сохранения: обнаружен дубликат данных")
 
 with tab2:
     db.show_admin_panel()
     st.write("---")
-    conn = sqlite3.connect(db.DB_NAME)
-    current_df = pd.read_sql_query("SELECT district FROM recipients", conn)
-    conn.close()
-    mb.render_barnaul_map(current_df)
+    
+    # Подгружаем районы из внутренней памяти для интерактивной карты
+    if "shelter_records" in st.session_state and not st.session_state.shelter_records.empty:
+        mb.render_barnaul_map(st.session_state.shelter_records)
