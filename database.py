@@ -45,12 +45,12 @@ def show_admin_panel():
 
     st.write("---")
     
-    # 2. РАЗДЕЛЬНЫЙ ПОИСК
+    # 2. РАЗДЕЛЬНЫЙ ПОИСК (ИСПРАВЛЕНО: обновлен ключ для сброса старого кэша)
     col1, col2 = st.columns(2)
     with col1:
-        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...", key="search_fio_final_v3")
+        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...", key="search_fio_v4_strict")
     with col2:
-        search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...", key="search_phone_final_v3")
+        search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...", key="search_phone_v4_strict")
 
     # 3. ФИЛЬТР ПО ДАТАМ
     st.write("---")
@@ -123,13 +123,13 @@ def show_admin_panel():
                 st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
                 st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
                 
-                # 2. Ссылки на фото
+                # 2. Ссылки на фото (ИСПРАВЛЕНО: photo_path заменено на photo_str для исключения аварийного прерывания кода)
                 photo_str = row.get('photo_path', '')
                 photo_person, photo_receipt = "Не указана", "Не указана"
                 
                 if photo_str and "|" in str(photo_str):
                     try:
-                        parts = str(photo_path).split("|")
+                        parts = str(photo_str).split("|")
                         for part in parts:
                             if "Человек:" in part: photo_person = part.replace("Человек:", "").strip()
                             if "Расписка:" in part: photo_receipt = part.replace("Расписка:", "").strip()
@@ -146,7 +146,7 @@ def show_admin_panel():
                 else:
                     st.markdown("**Фотоотчет:** Не прикреплен")
                 
-                # 3. ИСПРАВЛЕННЫЙ И СТРОГИЙ ПОРЯДОК СТРОК АНКЕТЫ
+                # 3. ТОЧНЫЙ СТРОГИЙ ПОРЯДОК СТРОК АНКЕТЫ
                 with st.expander("📝 Дополнительные данные анкеты", expanded=False):
                     st.markdown(f"**Номенклатура выданного корма:** {row.get('feed_type', '-')}")
                     st.markdown(f"**Район проживания:** {current_district}")
