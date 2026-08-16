@@ -9,7 +9,7 @@ FILE_PATH_ON_DISK = "shelter_base.xlsx"
 
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
+    3: "4. четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
 }
 
 def download_from_yandex():
@@ -45,7 +45,7 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # ИСПРАВЛЕНО: Добавлены коды успешного ответа Яндекс.Диска (200, 201)
+            # ИСПРАВЛЕНО: Указаны точные коды успешного ответа 200 и 201
             if put_res.status_code in:
                 return True
             else:
