@@ -8,73 +8,81 @@ def make_phone_callable(phone_str):
     clean_phone = "".join(filter(str.isdigit, phone_str))
     if not clean_phone.startswith("+"):
         clean_phone = "+" + clean_phone
-    return f'<a href="tel:{clean_phone}" style="text-decoration: none; color: #1f77b4; font-weight: bold;">📞 {phone_str}</a>'
+    return f'<a href="tel:{clean_phone}" style="text-decoration: none; color: #2C3E50; font-weight: bold;">📞 {phone_str}</a>'
 
 def render_analytics_charts(df):
     st.write("---")
-    st.markdown("### 📊 Статистика распределения данных")
+    # Маленький, аккуратный заголовок вместо большого subheader
+    st.markdown("<small style='color: #7F8C8D; font-weight: bold;'>СТАТИСТИКА РАСПРЕДЕЛЕНИЯ ДАННЫХ (СХЕМА)</small>", unsafe_allow_html=True)
     
     if df.empty:
         st.info("Нет данных для отображения статистики.")
         return
 
     col1, col2 = st.columns(2)
-    corporate_dark = "#2C3E50" 
+    # Строгий тонкий цвет линии (графитовый)
+    line_color = "#34495E"
     
     with col1:
-        st.markdown("**📅 Визиты по дням недели**")
+        st.markdown("<small style='color: #2C3E50;'>Визиты по дням недели</small>", unsafe_allow_html=True)
         if 'День недели визита' in df.columns:
             correct_order = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
             
-            weekday_counts = df['День недели визита'].value_counts().reset_index()
-            weekday_counts.columns = ['День недели', 'Количество']
+            # Гарантируем наличие всех дней недели в схеме, даже если там 0 визитов
+            base_df = pd.DataFrame({'День недели': correct_order})
+            counts = df['День недели визита'].value_counts().reset_index()
+            counts.columns = ['День недели', 'Количество']
             
-            weekday_counts['День недели'] = pd.Categorical(weekday_counts['День недели'], categories=correct_order, ordered=True)
-            weekday_counts = weekday_counts.sort_values(by='День недели')
+            weekday_counts = pd.merge(base_df, counts, on='День недели', how='left').fillna(0)
+            weekday_counts['Количество'] = weekday_counts['Количество'].astype(int)
             
-            fig_week = px.bar(
+            # Строим тонкую линию с точками вместо тяжелых серых столбов
+            fig_week = px.line(
                 weekday_counts, 
-                x='Количество', 
-                y='День недели', 
-                orientation='h',
-                category_orders={"День недели": correct_order}
+                x='День недели', 
+                y='Количество',
+                markers=True
             )
-            fig_week.update_traces(marker_color=corporate_dark, width=0.55)
-            # Убираем серые квадраты и делаем фон полностью прозрачным
+            fig_week.update_traces(line=dict(color=line_color, width=1.5), marker=dict(size=6, color=line_color))
             fig_week.update_layout(
-                height=260,
+                height=180, # Сделали график значительно ниже и компактнее
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=True),
-                yaxis=dict(showgrid=False, zeroline=False)
+                xaxis=dict(showgrid=False, zeroline=False, title="", tickfont=dict(size=10)),
+                yaxis=dict(showgrid=True, gridcolor='#ECF0F1', gridwidth=0.5, zeroline=False, title="", tickfont=dict(size=10), dtick=1)
             )
             st.plotly_chart(fig_week, use_container_width=True, config={'displayModeBar': False})
         else:
             st.warning("Данные недоступны.")
 
     with col2:
-        st.markdown("**🏘️ Распределение по районам города**")
+        st.markdown("<small style='color: #2C3E50;'>Распределение по районам</small>", unsafe_allow_html=True)
         if 'district' in df.columns:
-            district_counts = df['district'].value_counts().reset_index()
-            district_counts.columns = ['Район', 'Количество']
-            district_counts = district_counts.sort_values(by='Количество', ascending=True)
+            all_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
             
-            fig_dist = px.bar(
+            base_dist_df = pd.DataFrame({'Район': all_districts})
+            d_counts = df['district'].value_counts().reset_index()
+            d_counts.columns = ['Район', 'Количество']
+            
+            district_counts = pd.merge(base_dist_df, d_counts, on='Район', how='left').fillna(0)
+            district_counts['Количество'] = district_counts['Количество'].astype(int)
+            
+            # Тонкая графическая линия распределения по районам
+            fig_dist = px.line(
                 district_counts, 
-                x='Количество', 
-                y='Район', 
-                orientation='h'
+                x='Район', 
+                y='Количество',
+                markers=True
             )
-            fig_dist.update_traces(marker_color="#34495E", width=0.55)
-            # Делаем фон второго графика также прозрачным
+            fig_dist.update_traces(line=dict(color=line_color, width=1.5), marker=dict(size=6, color=line_color))
             fig_dist.update_layout(
-                height=260,
+                height=180,
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=True),
-                yaxis=dict(showgrid=False, zeroline=False)
+                xaxis=dict(showgrid=False, zeroline=False, title="", tickfont=dict(size=10)),
+                yaxis=dict(showgrid=True, gridcolor='#ECF0F1', gridwidth=0.5, zeroline=False, title="", tickfont=dict(size=10), dtick=1)
             )
             st.plotly_chart(fig_dist, use_container_width=True, config={'displayModeBar': False})
         else:
