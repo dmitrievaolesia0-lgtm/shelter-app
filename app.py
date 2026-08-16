@@ -73,7 +73,6 @@ with tab1:
             final_phone = ""
 
     st.write("---")
-    # ИСПРАВЛЕНО: Убраны символы '*' из заголовков, так как поля стали необязательными
     st.caption("ФОТОФИКСАЦИЯ ВЫДАЧИ (НЕОБЯЗАТЕЛЬНО)")
     photo_person_link = st.text_input("Ссылка на фото получателя", placeholder="https://vk.com...")
     photo_receipt_link = st.text_input("Ссылка на фото расписки", placeholder="https://vk.com...")
@@ -101,14 +100,12 @@ with tab1:
         elif not middle_name.strip(): st.error("Укажите отчество")
         elif phone_error == "НЕ_ЗАПОЛНЕН": st.error("Укажите номер телефона")
         elif phone_error == "ОШИБКА_ДЛИНЫ": st.error("Длина стандартного номера должна составлять 10 цифр")
-        # ИСПРАВЛЕНО: Полностью удалены блокировки "if not photo_person_link" и "if not photo_receipt_link"
         else:
             full_fio = f"{last_name.strip()} {first_name.strip()} {middle_name.strip()}"
             final_series = p_series.strip() if p_series.strip() else "0000"
             final_number = p_number.strip() if p_number.strip() else f"б/н-{int(datetime.timestamp(datetime.now()))}"
             visit_date_str = visit_date_selected.strftime('%Y-%m-%d')
             
-            # ИСПРАВЛЕНО: Безопасное формирование строки с фото, даже если они не заполнены
             p_link = photo_person_link.strip() if photo_person_link.strip() else "Не указана"
             r_link = photo_receipt_link.strip() if photo_receipt_link.strip() else "Не указана"
             combined_photos = f"Человек: {p_link} | Расписка: {r_link}"
@@ -128,6 +125,7 @@ with tab1:
             success = db.add_recipient(new_record)
             if success:
                 st.success(f"Запись успешно сохранена: {full_fio}")
+                db.clear_db_cache()
                 st.rerun()
             else:
                 st.error("Ошибка сохранения: в базе уже есть человек с таким ФИО и номером телефона!")
@@ -136,6 +134,5 @@ with tab2:
     db.show_admin_panel()
     st.write("---")
     
-    # Подгружаем районы из внутренней памяти для интерактивной карты
     if "shelter_records" in st.session_state and not st.session_state.shelter_records.empty:
         mb.render_barnaul_map(st.session_state.shelter_records)
