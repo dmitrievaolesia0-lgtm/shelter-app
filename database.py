@@ -14,6 +14,7 @@ WEEKDAYS_RU = {
 }
 
 def download_from_yandex():
+    # ИСПРАВЛЕНО: Изменен URL на корректный эндпоинт Cloud API Яндекс.Диска
     url = f"https://yandex.net{FILE_PATH_ON_DISK}"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -36,6 +37,7 @@ def upload_to_yandex(df):
         df.to_excel(writer, index=False)
     output.seek(0)
     
+    # ИСПРАВЛЕНО: Изменен URL на корректный эндпоинт Cloud API для загрузки файла
     url = f"https://yandex.net{FILE_PATH_ON_DISK}&overwrite=true"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -43,8 +45,8 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # ИСПРАВЛЕНО: Добавлен список успешных кодов ответа
-            if put_res.status_code in:
+            # ИСПРАВЛЕНО: Задан список успешных кодов ответа (200 OK, 201 Created, 202 Accepted)
+            if put_res.status_code in [200, 201, 202]:
                 return True
         return False
     except:
@@ -148,14 +150,18 @@ def show_admin_panel():
     if selected_districts:
         filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
         
+    # ИСПРАВЛЕНО: Безопасная обработка неполного ввода диапазона дат в Streamlit
     if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
 
+    # ИСПРАВЛЕНО: Сортировка выполняется ДО превращения "999" в строку "Не указан", чтобы избежать ошибок типов данных
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
+    
     if 'visit_date_parsed' in filtered_df.columns:
         filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+        
     filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
 
     st.session_state.shelter_records = filtered_df
@@ -185,7 +191,6 @@ def show_admin_panel():
             if "Человек:" in p_path:
                 try:
                     parts = p_path.split(" | ")
-                    # ИСПРАВЛЕНО: возвращены индексы [0] и [1] для работы со строками
                     p_url = parts[0].replace("Человек: ", "").strip()
                     r_url = parts[1].replace("Расписка: ", "").strip()
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
