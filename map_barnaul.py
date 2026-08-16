@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import folium
 from streamlit_folium import st_folium
 
@@ -13,50 +14,67 @@ BARNAUL_DISTRICTS = {
 
 def render_barnaul_map(df_recipients=None):
     """
-    Отрисовывает интерактивную карту Барнаула.
-    Если передан DataFrame с волонтерами/получателями, 
-    подсчитывает их количество по районам и выводит маркеры.
+    Отрисовывает строгую интерактивную карту Барнаула со списками людей.
     """
-    st.subheader("🗺️ Интерактивная карта районов Барнаула")
+    st.markdown("<small style='color: #7F8C8D; font-weight: bold;'>ИНТЕРАКТИВНАЯ КАРТА РАЙОНОВ ГОРОДА</small>", unsafe_allow_html=True)
     
-    # Считаем количество людей в каждом районе
-    counts = {district: 0 for district in BARNAUL_DISTRICTS.keys()}
+    # Группируем людей по районам
+    people_by_district = {district: [] for district in BARNAUL_DISTRICTS.keys()}
+    
     if df_recipients is not None and not df_recipients.empty and 'district' in df_recipients.columns:
-        for dist in df_recipients['district']:
-            if dist in counts:
-                counts[dist] += 1
+        for _, row in df_recipients.iterrows():
+            dist = row.get('district', '')
+            if dist in people_by_district:
+                people_by_district[dist].append({
+                    "fio": row.get('fio', 'Без имени'),
+                    "phone": row.get('phone', '-')
+                })
 
-    # Создаем карту с центром в Барнауле
-    m = folium.Map(location=[53.3547, 83.7698], zoom_start=11)
+    # Создаем карту с базовым центром в Барнауле
+    m = folium.Map(location=[53.3450, 83.7500], zoom_start=11, tiles="OpenStreetMap")
 
-    # Добавляем маркеры для каждого района
+    # Отрисовываем маркеры на карте
     for district, coords in BARNAUL_DISTRICTS.items():
-        count = counts[district]
+        list_of_people = people_by_district[district]
+        count = len(list_of_people)
         
-        # Цвет маркера зависит от того, есть ли там люди
-        marker_color = "green" if count > 0 else "blue"
+        # Строгие корпоративные цвета вместо яркого зеленого
+        marker_color = "cadetblue" if count > 0 else "blue"
         
-        popup_text = f"<b>{district} район</b><br>Зарегистрировано: {count} чел."
-        tooltip_text = f"{district}: {count}"
+        # Формируем HTML-список для вывода во всплывающем окне маркера
+        popup_html = f"<div style='font-family: sans-serif; font-size: 12px; min-width: 180px;'>"
+        popup_html += f"<b>{district} район</b> (Всего: {count} чел.)<hr style='margin: 4px 0; border: 0; border-top: 1px solid #ccc;'>"
+        
+        if count > 0:
+            for person in list_of_people[:10]:  # Выводим первые 10 человек в попап для компактности
+                popup_html += f"• {person['fio']} ({person['phone']})<br>"
+            if count > 10:
+                popup_html += f"<i>и еще {count - 10} чел...</i>"
+        else:
+            popup_html += "<span style='color: #95A5A6;'>Нет зарегистрированных</span>"
+        popup_html += "</div>"
         
         folium.Marker(
             location=coords,
-            popup=folium.Popup(popup_text, max_width=250),
-            tooltip=tooltip_text,
-            icon=folium.Icon(color=marker_color, icon="info-sign")
+            popup=folium.Popup(popup_html, max_width=300),
+            tooltip=f"{district}: {count} чел.",
+            icon=folium.Icon(color=marker_color, icon="home", prefix="fa")
         ).add_to(m)
 
-    # Отображаем карту в Streamlit
-    st_folium(m, width=700, height=450)
+    # Выводим карту на экран
+    st_folium(m, width="100%", height=400, returned_objects=[])
 
-# Тестовый запуск модуля с искусственными данными
+    # СТРОГАЯ ТЕКСТОВАЯ НАВИГАЦИЯ ПОД КАРТОЙ
+    st.write("---")
+    st.markdown("<small style='color: #2C3E50; font-weight: bold;'>Списки жителей по административным районам:</small>", unsafe_allow_html=True)
+    
+    # Выводим районы в виде раскрывающихся списков (аккордеонов) под картой
+    for district, list_of_people in people_by_district.items():
+        count = len(list_of_people)
+        if count > 0:
+            with st.expander(f"📍 {district} район — зарегистрировано {count} чел."):
+                for person in list_of_people:
+                    st.markdown(f"<small style='color: #34495E;'>• <b>{person['fio']}</b> | Тел: {person['phone']}</small>", unsafe_allow_html=True)
+
 if __name__ == "__main__":
-    import pandas as pd
-    st.title("Тест карты Барнаула")
-    
-    # Создаем фейковые данные для проверки счетчиков
-    fake_data = pd.DataFrame({
-        'district': ["Индустриальный", "Индустриальный", "Центральный", "Ленинский"]
-    })
-    
-    render_barnaul_map(fake_data)
+    st.title("Тест карты")
