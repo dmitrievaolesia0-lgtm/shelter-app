@@ -67,18 +67,52 @@ def get_weekday_name(date_str):
 
 def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
-    if st.button("🔄 Обновить данные из облака"):
+    if st.button("🔄 Обновить данные из облака", use_container_width=True):
         st.rerun()
         
     df = cloud.download_from_yandex()
     if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
         
-    search_fio = st.text_input("Поиск (ФИО / телефон)", placeholder="Введите текст...")
-    all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
-    selected_districts = st.multiselect("Фильтр по районам города", options=all_barnaul_districts, default=[])
+    if df.empty or len(df) == 0:
+        st.write("---")
+        st.info("Архив базы данных пуст.")
+        return
 
-    if not df.empty and 'visit_date' in df.columns:
+    # 1. СОРТИРОВКА И РАЙОНЫ
+    sort_options = {
+        "По районам города (А-Я)": ("district", True),
+        "Сначала новые визиты": ("visit_date", False),
+        "Сначала старые визиты": ("visit_date", True),
+        "От старших к младшим (Возраст)": ("Возраст", True),
+        "По алфавиту (ФИО)": ("fio", True)
+    }
+    selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
+
+    all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
+    selected_districts = st.multiselect("Фильтр по районам города (Оставьте пустым для показа ВСЕЙ базы)", options=all_barnaul_districts, default=[])
+
+    # НАСТРОЙКА ВИДА ВЫВОДА (НОВОЕ)
+    view_mode = st.radio(
+        "Формат вывода данных:",
+        ["Полная анкета (Карточки)", "Компактный вид (Только ФИО + Телефон)"],
+        horizontal=True
+    )
+
+    st.write("---")
+    
+    # 2. РАЗДЕЛЬНЫЙ ПОИСК
+    col1, col2 = st.columns(2)
+    with col1:
+        search_last_name = st.text_input("Поиск по фамилии", placeholder="Иванов...")
+    with col2:
+        search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...")
+
+    # 3. АКТИВАЦИЯ ПЕРИОДА ПОСЕЩЕНИЯ
+    st.write("---")
+    use_date_filter = st.checkbox("🔄 Фильтровать по периоду посещения", value=False)
+    
+    if 'visit_date' in df.columns:
         df['visit_date_parsed'] = pd.to_datetime(df['visit_date'], errors='coerce').dt.date
         min_date, max_value = df['visit_date_parsed'].min(), df['visit_date_parsed'].max()
         if pd.isna(min_date): min_date = date.today()
@@ -87,39 +121,36 @@ def show_admin_panel():
         min_date, max_value = date.today(), date.today()
 
     if min_date > max_value: min_date = max_value
-    date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
+    
+    date_range = st.date_input(
+        "Период посещения", 
+        value=(min_date, max_value), 
+        min_value=min_date, 
+        max_value=max_value,
+        disabled=not use_date_filter
+    )
 
-    sort_options = {
-        "Сначала новые визиты": ("visit_date", False),
-        "Сначала старые визиты": ("visit_date", True),
-        "По районам города (А-Я)": ("district", True),
-        "От старших к младшим (Возраст)": ("Возраст", True),
-        "По алфавиту (ФИО)": ("fio", True)
-    }
-    selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
-
-    if df.empty or len(df) == 0:
-        st.write("---")
-        st.info("Архив базы данных пуст.")
-        return
-
+    # Расчет колонок перед фильтрацией
     df['Возраст'] = df['birth_date'].apply(calculate_age)
     df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
 
+    # ПРИМЕНЕНИЕ ФИЛЬТРОВ
     filtered_df = df.copy()
-    if search_fio:
-        filtered_df = filtered_df[
-            filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False) | 
-            filtered_df['phone'].astype(str).str.contains(search_fio, na=False)
-        ]
+    
+    if search_last_name:
+        filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_last_name, case=False, na=False)]
+        
+    if search_phone:
+        filtered_df = filtered_df[filtered_df['phone'].astype(str).str.contains(search_phone, na=False)]
     
     if selected_districts:
         filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
         
-    if isinstance(date_range, tuple) and len(date_range) == 2:
+    if use_date_filter and isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
 
+    # Применение выбранной сортировки
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
     
@@ -132,13 +163,22 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(filtered_df)}")
 
-    for index, row in filtered_df.iterrows():
-        with st.expander(f"👤 {row.get('fio', 'Без имени')} | {row.get('district', 'Не определен')} район"):
-            st.markdown(f"**Контакты:** {row.get('phone', '-')}")
-            st.markdown(f"**Дата визита:** {row.get('visit_date', '-')}")
-            st.write("---")
-            st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
-            st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
-            st.text(f"Адрес: {row.get('address', '-')}")
-            st.text(f"Выданный корм: {row.get('feed_type', '-')}")
-            st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
+    # ОТРИСОВКА СПИСКА
+    if view_mode == "Компактный вид (Только ФИО + Телефон)":
+        # Выводим красивую чистую таблицу без лишних полей
+        short_df = filtered_df[['fio', 'phone', 'district', 'visit_date']].copy()
+        short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
+        st.dataframe(short_df, use_container_width=True, hide_index=True)
+    else:
+        # Выводим полные раскрывающиеся анкеты
+        for index, row in filtered_df.iterrows():
+            with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{row.get('district', 'Не определен')}]"):
+                st.markdown(f"**Контакты:** {row.get('phone', '-')}")
+                st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
+                st.write("---")
+                st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
+                st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
+                st.text(f"Адрес: {row.get('address', '-')}")
+                st.text(f"Выданный корм: {row.get('feed_type', '-')}")
+                st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
+
