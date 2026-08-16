@@ -5,20 +5,21 @@ from datetime import date, datetime
 import yandex_cloud as cloud
 import db_core as core
 import db_dialogs as dialogs
-import db_analytics as analytics  # Подключаем модуль аналитики
+import db_analytics as analytics
 
-# Перенаправляем функции для совместимости с главным файлом app.py
 init_db = core.init_db
 add_recipient = core.add_recipient
 
 def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
+    
+    # Кнопка теперь мгновенно сбрасывает кэш и заставляет скачать свежий файл
     if st.button("🔄 Обновить данные из облака", use_container_width=True):
+        core.clear_db_cache()
         st.rerun()
         
-    df = cloud.download_from_yandex()
-    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
-        df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
+    # БЕРЕМ ДАННЫЕ ИЗ БЫСТРОГО КЭША
+    df = core.cached_download()
         
     if df.empty or len(df) == 0:
         st.write("---")
@@ -75,11 +76,11 @@ def show_admin_panel():
         disabled=not use_date_filter
     )
 
-    # Вызовы математических функций из ядра
+    # Расчеты в памяти
     df['Возраст'] = df['birth_date'].apply(core.calculate_age)
     df['День недели визита'] = df['visit_date'].apply(core.get_weekday_name)
 
-    # Фильтрация
+    # Моментальная фильтрация в памяти
     filtered_df = df.copy()
     
     if search_last_name:
@@ -109,7 +110,7 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
-    # Отображение данных
+    # Отображение
     if view_mode == "Компактный вид (Только ФИО + Телефон)":
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
@@ -133,9 +134,11 @@ def show_admin_panel():
                 with btn_col1:
                     if st.button("✏️ Редактировать", key=f"edit_{idx}", use_container_width=True):
                         dialogs.edit_dialog(idx, row, df)
+                        core.clear_db_cache()  # Сбрасываем кэш после редактирования
                 with btn_col2:
                     if st.button("🚨 Удалить", key=f"del_{idx}", use_container_width=True):
                         dialogs.delete_dialog(idx, row.get('fio', 'Без имени'), df)
+                        core.clear_db_cache()  # Сбрасываем кэш после удаления
 
-    # Обязательный вызов графиков в самом конце панели
+    # Моментальные графики
     analytics.render_analytics_charts(display_df)
