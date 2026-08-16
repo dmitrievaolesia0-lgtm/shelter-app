@@ -99,7 +99,7 @@ with tab1:
                 "feed_type": feed_type.strip() if feed_type.strip() else "Не указан",
                 "photo_path": "No photo",
                 "visit_date": datetime.today().strftime('%Y-%m-%d')
-            }_
+            }
             
             # Сохраняем готовую запись в БД
             success = db.add_recipient(new_record)
