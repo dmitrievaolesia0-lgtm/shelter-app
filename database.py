@@ -43,7 +43,7 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # Ошибка исправлена: проверяем успешные коды ответов Яндекса (200 или 201)
+            # Проверяем успешные коды ответов Яндекса (200 или 201)
             if put_res.status_code in:
                 return True
         return False
@@ -182,7 +182,7 @@ def show_admin_panel():
             if "Человек:" in p_path:
                 try:
                     parts = p_path.split(" | ")
-                    # Исправлен синтаксический баг с разбором путей (берем элементы по индексам списка)
+                    # Исправлено: парсим строки по индексам списка, убирая префиксы
                     p_url = parts[0].replace("Человек: ", "").strip()
                     r_url = parts[1].replace("Расписка: ", "").strip()
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
