@@ -75,3 +75,19 @@ def get_weekday_name(date_str):
         return WEEKDAYS_RU[dt.weekday()]
     except: 
         return "Не определен"
+def make_vk_deeplink(vk_url):
+    """Преобразует стандартную ссылку ВК в мобильный диплинк для открытия в приложении."""
+    if not vk_url or pd.isna(vk_url) or vk_url in ["Не указана", "Не указан", ""]:
+        return None
+        
+    url_str = str(vk_url).strip()
+    
+    # Если ссылка уже является диплинком, возвращаем как есть
+    if url_str.startswith("vk://"):
+        return url_str
+        
+    # Очищаем от протоколов http/https и префиксов
+    cleaned = url_str.replace("https://", "").replace("http://", "").replace("www.", "")
+    
+    # Формируем универсальный мобильный диплинк
+    return f"vk://{cleaned}"
