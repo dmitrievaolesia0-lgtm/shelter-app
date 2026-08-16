@@ -4,28 +4,40 @@ from datetime import datetime
 import yandex_cloud as cloud
 
 WEEKDAYS_RU = {
-    0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
+    0: "Понедельник", 1: "Вторник", 2: "Среда", 
+    3: "Четверг", 4: "Пятница", 5: "Суббота", 6: "Воскресенье"
 }
 
-def init_db():
+@st.cache_data(show_spinner="Загрузка базы данных из облака Яндекс...")
+def cached_download():
+    """Сверхбыстрое скачивание с кэшированием в оперативной памяти."""
     df = cloud.download_from_yandex()
+    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
+        df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
+    return df
+
+def clear_db_cache():
+    """Очищает кэш для принудительного обновления данных."""
+    st.cache_data.clear()
+
+def init_db():
+    df = cached_download()
     if df.empty or len(df) == 0:
         empty_df = cloud.get_empty_template()
         cloud.upload_to_yandex(empty_df)
+        clear_db_cache()
 
 def add_recipient(data_dict):
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
         data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
         
-    df = cloud.download_from_yandex()
-    
-    if not df.empty:
-        df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
+    df = cached_download()
     
     if df.empty or len(df) == 0:
         new_row_df = pd.DataFrame([data_dict])
-        return cloud.upload_to_yandex(new_row_df)
+        success = cloud.upload_to_yandex(new_row_df)
+        clear_db_cache()
+        return success
         
     curr_fio = str(data_dict.get('fio', '')).strip().lower()
     curr_phone = str(data_dict.get('phone', '')).strip().lower()
@@ -41,7 +53,9 @@ def add_recipient(data_dict):
 
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
-    return cloud.upload_to_yandex(updated_df)
+    success = cloud.upload_to_yandex(updated_df)
+    clear_db_cache()
+    return success
 
 def calculate_age(birth_date_str):
     try:
