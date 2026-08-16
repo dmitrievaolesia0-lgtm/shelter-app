@@ -3,21 +3,23 @@ import pandas as pd
 from datetime import datetime
 import yandex_cloud as cloud
 
+# Чистые строгие названия дней недели для графиков и карточек
 WEEKDAYS_RU = {
     0: "Понедельник", 1: "Вторник", 2: "Среда", 
     3: "Четверг", 4: "Пятница", 5: "Суббота", 6: "Воскресенье"
 }
 
-@st.cache_data(show_spinner="Загрузка базы данных из облака Яндекс...")
+# СОВРЕМЕННЫЙ СТАНДАРТ: ttl=300 автоматически обновляет базу каждые 5 минут без участия человека
+@st.cache_data(show_spinner="Загрузка базы данных из облака Яндекс...", ttl=300)
 def cached_download():
-    """Сверхбыстрое скачивание с кэшированием в оперативной памяти."""
+    """Сверхбыстрое скачивание с официальным кэшированием в памяти."""
     df = cloud.download_from_yandex()
     if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
     return df
 
 def clear_db_cache():
-    """Очищает кэш для принудительного обновления данных."""
+    """Официальный метод очистки кэша данных в современном Streamlit."""
     st.cache_data.clear()
 
 def init_db():
@@ -25,7 +27,7 @@ def init_db():
     if df.empty or len(df) == 0:
         empty_df = cloud.get_empty_template()
         cloud.upload_to_yandex(empty_df)
-        clear_db_cache()
+        st.cache_data.clear()
 
 def add_recipient(data_dict):
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
@@ -36,7 +38,7 @@ def add_recipient(data_dict):
     if df.empty or len(df) == 0:
         new_row_df = pd.DataFrame([data_dict])
         success = cloud.upload_to_yandex(new_row_df)
-        clear_db_cache()
+        st.cache_data.clear()
         return success
         
     curr_fio = str(data_dict.get('fio', '')).strip().lower()
@@ -54,7 +56,7 @@ def add_recipient(data_dict):
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
     success = cloud.upload_to_yandex(updated_df)
-    clear_db_cache()
+    st.cache_data.clear()
     return success
 
 def calculate_age(birth_date_str):
