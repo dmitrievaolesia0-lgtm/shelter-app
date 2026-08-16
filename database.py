@@ -16,19 +16,25 @@ WEEKDAYS_RU = {
 def download_from_yandex():
     url = f"https://yandex.net{FILE_PATH_ON_DISK}"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
+    
+    # Сразу создаем шаблон правильной пустой таблицы на случай ошибки скачивания
+    empty_template = pd.DataFrame(columns=[
+        'fio', 'birth_date', 'passport_series', 'passport_number',
+        'passport_date', 'passport_code', 'phone', 'district',
+        'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
+    ])
+    
     try:
         res = requests.get(url, headers=headers).json()
         download_url = res.get("href")
         if not download_url:
-            return pd.DataFrame(columns=[
-                'fio', 'birth_date', 'passport_series', 'passport_number',
-                'passport_date', 'passport_code', 'phone', 'district',
-                'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
-            ])
+            return empty_template
         file_res = requests.get(download_url)
-        return pd.read_excel(io.BytesIO(file_res.content))
+        if file_res.status_code == 200:
+            return pd.read_excel(io.BytesIO(file_res.content))
+        return empty_template
     except:
-        return pd.DataFrame()
+        return empty_template
 
 def upload_to_yandex(df):
     output = io.BytesIO()
@@ -43,14 +49,22 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            return True
+            # Если Яндекс ответил успехом (200 или 201), то файл точно записан
+            if put_res.status_code in:
+                return True
+            else:
+                st.error(f"Яндекс.Диск отклонил запись. Код ответа: {put_res.status_code}")
+        else:
+            st.error("Не удалось получить ссылку для загрузки от Яндекс.Диска. Проверьте YANDEX_TOKEN.")
         return False
-    except:
+    except Exception as e:
+        st.error(f"Сбой сети при загрузке в облако: {str(e)}")
         return False
 
 def init_db():
     df = download_from_yandex()
-    if df.empty:
+    # Если на диске пусто или файла нет, создаем правильный пустой шаблон
+    if df.empty or len(df) == 0:
         empty_df = pd.DataFrame(columns=[
             'fio', 'birth_date', 'passport_series', 'passport_number',
             'passport_date', 'passport_code', 'phone', 'district',
@@ -64,28 +78,29 @@ def add_recipient(data_dict):
         
     df = download_from_yandex()
     
-    # ЖЕСТКАЯ ОЧИСТКА: Удаляем из таблицы строки, где ФИО или Телефон пустые (NaN)
+    # Очищаем таблицу от возможных полностью пустых строк (NaN)
     if not df.empty:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
     
-    # Если после очистки скрытого мусора таблица пустая — сразу сохраняем
-    if df.empty or 'fio' not in df.columns or 'phone' not in df.columns:
+    # Если в базе физически пусто — отключаем любые проверки дубликатов и сохраняем
+    if df.empty or len(df) == 0:
         new_row_df = pd.DataFrame([data_dict])
         return upload_to_yandex(new_row_df)
         
     curr_fio = str(data_dict.get('fio', '')).strip().lower()
     curr_phone = str(data_dict.get('phone', '')).strip().lower()
     
-    # Проверяем на дубликат только среди РЕАЛЬНО ЗАПОЛНЕННЫХ строк базы
-    if curr_fio and curr_phone and curr_fio != "nan" and curr_phone != "nan":
+    # Проверка на дубликат срабатывает ТОЛЬКО если в базе реально есть строки
+    if curr_fio and curr_phone:
         db_fio = df['fio'].astype(str).str.strip().str.lower()
         db_phone = df['phone'].astype(str).str.strip().str.lower()
         
         duplicate = df[(db_fio == curr_fio) & (db_phone == curr_phone)]
         if not duplicate.empty:
-            return False  # Запрет только если совпали реальный человек и реальный телефон
+            st.warning("Внимание: этот человек с таким номером телефона уже зарегистрирован в базе.")
+            return False
 
-    # Добавляем новую запись в чистую таблицу
+    # Добавляем строку и шлем в Яндекс
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
     return upload_to_yandex(updated_df)
@@ -115,7 +130,6 @@ def show_admin_panel():
         
     df = download_from_yandex()
     
-    # Перед отображением в админке тоже убираем пустые строки NaN
     if not df.empty:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
         
@@ -203,8 +217,8 @@ def show_admin_panel():
                 if "Человек:" in p_path:
                     try:
                         parts = p_path.split(" | ")
-                        p_url = parts[0].replace("Человек: ", "").strip()
-                        r_url = parts[1].replace("Расписка: ", "").strip()
+                        p_url = parts.replace("Человек: ", "").strip()
+                        r_url = parts.replace("Расписка: ", "").strip()
                         if p_url and p_url != "Не указана":
                             st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
                         if r_url and r_url != "Не указана":
