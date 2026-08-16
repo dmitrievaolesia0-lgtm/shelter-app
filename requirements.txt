@@ -1,2 +1,4 @@
-folium
-streamlit-folium
+streamlit
+pandas
+requests
+openpyxl
