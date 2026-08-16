@@ -2,21 +2,18 @@ import streamlit as st
 from datetime import date
 
 def render_date_picker(label="Дата рождения", key_prefix="birth"):
-    """Минималистичный выбор даты рождения в строгом корпоративном стиле."""
-    # Строгое отображение без лишних радиокнопок и эмодзи
+    """Минималистичный выбор даты рождения в едином стиле с текстовыми полями."""
+    # label передается напрямую в st.date_input, что делает шрифт точно таким же, как у st.text_input
     selected_date = st.date_input(
-        label, 
-        value=date(1990, 1, 1),        # Нейтральный год по умолчанию
-        min_value=date(1930, 1, 1),    # Нижняя граница возраста
-        max_value=date(2026, 12, 31),  # Верхняя граница (текущий год)
+        label=label, 
+        value=date(1990, 1, 1),        
+        min_value=date(1930, 1, 1),    
+        max_value=date(2026, 12, 31),  
         key=f"{key_prefix}_calendar",
-        format="DD.MM.YYYY"            # Привычный формат отображения на экране
+        format="DD.MM.YYYY"            
     )
     
-    # Возвращаем строковое представление в формате ГГГГ-ММ-ДД для базы данных
     return selected_date.strftime('%Y-%m-%d')
 
 if __name__ == "__main__":
-    st.title("Тест модуля даты")
     res_date = render_date_picker()
-    st.write("Результат:", res_date)
