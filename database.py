@@ -65,7 +65,41 @@ def get_weekday_name(date_str):
     except: 
         return "Не определен"
 
-def show_admin_panel():
+
+        disabled=not use_date_filter
+    )
+
+    # Расчет колонок перед фильтрацией
+    df['Возраст'] = df['birth_date'].apply(calculate_age)
+    df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
+
+    # ПРИМЕНЕНИЕ ФИЛЬТРОВ
+    filtered_df = df.copy()
+    
+    if search_last_name:
+        filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_last_name, case=False, na=False)]
+        
+    if search_phone:
+        filtered_df = filtered_df[filtered_df['phone'].astype(str).str.contains(search_phone, na=False)]
+    
+    if selected_districts:
+        filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
+        
+    if use_date_filter and isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+        filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
+
+    # Применение выбранной сортировки
+    sort_column, ascending_order = sort_options[selected_sort]
+    filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
+    
+    if 'visit_date_parsed' in filtered_df.columns:
+        filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+        
+    filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
+    st.session_state.shelter_records = filtered_df
+
+    def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
     if st.button("🔄 Обновить данные из облака", use_container_width=True):
         st.rerun()
@@ -92,7 +126,7 @@ def show_admin_panel():
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     selected_districts = st.multiselect("Фильтр по районам города (Оставьте пустым для показа ВСЕЙ базы)", options=all_barnaul_districts, default=[])
 
-    # НАСТРОЙКА ВИДА ВЫВОДА (НОВОЕ)
+    # НАСТРОЙКА ВИДА ВЫВОДА
     view_mode = st.radio(
         "Формат вывода данных:",
         ["Полная анкета (Карточки)", "Компактный вид (Только ФИО + Телефон)"],
@@ -157,21 +191,57 @@ def show_admin_panel():
     if 'visit_date_parsed' in filtered_df.columns:
         filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
         
-    filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
-    st.session_state.shelter_records = filtered_df
+    display_df = filtered_df.copy()
+    display_df['Возраст'] = display_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
+    st.session_state.shelter_records = display_df
 
     st.write("---")
-    st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(filtered_df)}")
+    st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
+
+    # Создаем всплывающее окно для РЕДАКТИРОВАНИЯ
+    @st.dialog("Редактирование анкеты")
+    def edit_dialog(row_index, current_row):
+        st.write(f"Изменение данных для: **{current_row['fio']}**")
+        new_fio = st.text_input("ФИО", value=current_row.get('fio', ''))
+        new_phone = st.text_input("Телефон", value=current_row.get('phone', ''))
+        new_district = st.selectbox("Район", all_barnaul_districts, index=all_barnaul_districts.index(current_row['district']) if current_row['district'] in all_barnaul_districts else 5)
+        new_address = st.text_input("Адрес", value=current_row.get('address', ''))
+        new_feed = st.text_input("Корм", value=current_row.get('feed_type', ''))
+        
+        if st.button("Сохранить изменения", type="primary", use_container_width=True):
+            # Обновляем оригинальный датафрейм (не отфильтрованный, а полный из облака)
+            df.loc[row_index, 'fio'] = new_fio.strip()
+            df.loc[row_index, 'phone'] = new_phone.strip()
+            df.loc[row_index, 'district'] = new_district
+            df.loc[row_index, 'address'] = new_address.strip()
+            df.loc[row_index, 'feed_type'] = new_feed.strip()
+            
+            if cloud.upload_to_yandex(df):
+                st.success("Данные успешно обновлены в облаке!")
+                st.rerun()
+            else:
+                st.error("Не удалось сохранить изменения.")
+
+    # Создаем всплывающее окно для УДАЛЕНИЯ
+    @st.dialog("Удаление записи")
+    def delete_dialog(row_index, fio):
+        st.warning(f"Вы уверены, что хотите НАВСЕГДА удалить из базы: **{fio}**?")
+        st.write("Это действие нельзя будет отменить.")
+        if st.button("🚨 ДА, УДАЛИТЬ", type="primary", use_container_width=True):
+            updated_df = df.drop(index=row_index)
+            if cloud.upload_to_yandex(updated_df):
+                st.success("Запись успешно удалена!")
+                st.rerun()
+            else:
+                st.error("Не удалось удалить запись.")
 
     # ОТРИСОВКА СПИСКА
     if view_mode == "Компактный вид (Только ФИО + Телефон)":
-        # Выводим красивую чистую таблицу без лишних полей
-        short_df = filtered_df[['fio', 'phone', 'district', 'visit_date']].copy()
+        short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
         st.dataframe(short_df, use_container_width=True, hide_index=True)
     else:
-        # Выводим полные раскрывающиеся анкеты
-        for index, row in filtered_df.iterrows():
+        for idx, row in filtered_df.iterrows():
             with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{row.get('district', 'Не определен')}]"):
                 st.markdown(f"**Контакты:** {row.get('phone', '-')}")
                 st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
@@ -181,4 +251,14 @@ def show_admin_panel():
                 st.text(f"Адрес: {row.get('address', '-')}")
                 st.text(f"Выданный корм: {row.get('feed_type', '-')}")
                 st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
+                
+                st.write("---")
+                # Кнопки управления анкетой
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    if st.button("✏️ Редактировать", key=f"edit_{idx}", use_container_width=True):
+                        edit_dialog(idx, row)
+                with btn_col2:
+                    if st.button("🗑️ Удалить", key=f"del_{idx}", use_container_width=True):
+                        delete_dialog(idx, row.get('fio', 'Без имени'))
 
