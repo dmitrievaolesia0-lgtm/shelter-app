@@ -6,19 +6,21 @@ import yandex_cloud as cloud
 import db_core as core
 import db_dialogs as dialogs
 import db_analytics as analytics
+import db_birthdays as birthdays
 
+# Перенаправляем функции для совместимости с главным файлом app.py
 init_db = core.init_db
 add_recipient = core.add_recipient
 
 def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
     
-    # Кнопка теперь мгновенно сбрасывает кэш и заставляет скачать свежий файл
+    # Кнопка мгновенно сбрасывает кэш и скачивает свежий файл
     if st.button("🔄 Обновить данные из облака", use_container_width=True):
         core.clear_db_cache()
         st.rerun()
         
-    # БЕРЕМ ДАННЫЕ ИЗ БЫСТРОГО КЭША
+    # Данные берутся из быстрого кэша оперативной памяти
     df = core.cached_download()
         
     if df.empty or len(df) == 0:
@@ -76,11 +78,11 @@ def show_admin_panel():
         disabled=not use_date_filter
     )
 
-    # Расчеты в памяти
+    # Расчет колонок перед фильтрацией
     df['Возраст'] = df['birth_date'].apply(core.calculate_age)
     df['День недели визита'] = df['visit_date'].apply(core.get_weekday_name)
 
-    # Моментальная фильтрация в памяти
+    # Применение фильтров
     filtered_df = df.copy()
     
     if search_last_name:
@@ -110,8 +112,7 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
-    # Отображение
-        # Отображение данных
+    # Отображение данных
     if view_mode == "Компактный вид (Только ФИО + Телефон)":
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
@@ -123,31 +124,34 @@ def show_admin_panel():
                 current_district = "Не определен"
                 
             with st.expander(f"👤 {row.get('fio', 'Без имени')} | [{current_district}]"):
-                # 1. КОНТАКТЫ (Кликабельный номер телефона)
+                # 1. КОНТАКТЫ (Кликабельный номер)
                 callable_phone = analytics.make_phone_callable(row.get('phone', '-'))
                 st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
 
                 # 2. ДАТА ВИЗИТА
                 st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
                 
-                # 3. ССЫЛКИ НА ФОТООТЧЕТ (ДОБАВЛЕНО СЮДА)
+                # 3. ССЫЛКИ НА ФОТООТЧЕТ
                 photo_str = row.get('photo_path', '')
                 photo_person = "Не указана"
                 photo_receipt = "Не указана"
                 
-                if photo_str and "|" in photo_str:
+                # Безопасно разбираем строку с фотографиями
+                if photo_str and "|" in str(photo_str):
                     try:
-                        parts = photo_str.split("|")
-                        photo_person = parts[0].replace("Человек:", "").strip()
-                        photo_receipt = parts[1].replace("Расписка:", "").strip()
+                        parts = str(photo_str).split("|")
+                        for part in parts:
+                            if "Человек:" in part:
+                                photo_person = part.replace("Человек:", "").strip()
+                            if "Расписка:" in part:
+                                photo_receipt = part.replace("Расписка:", "").strip()
                     except:
                         pass
                 
-                # Компактный вывод кликабельных ссылок на фото
                 links_html = []
-                if photo_person and photo_person != "Не указана":
+                if photo_person and photo_person != "Не указана" and photo_person.startswith("http"):
                     links_html.append(f'<a href="{photo_person}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото получателя</a>')
-                if photo_receipt and photo_receipt != "Не указана":
+                if photo_receipt and photo_receipt != "Не указана" and photo_receipt.startswith("http"):
                     links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото расписки</a>')
                 
                 if links_html:
@@ -158,7 +162,7 @@ def show_admin_panel():
                 st.write("---")
                 st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
                 
-                # 4. ОСТАЛЬНЫЕ ДАННЫЕ АНКЕТЫ (ВЕРНУЛИ НА МЕСТО)
+                # 4. ОСТАЛЬНЫЕ ДАННЫЕ АНКЕТЫ
                 st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
                 st.text(f"Район проживания: {current_district}")
                 st.text(f"Адрес: {row.get('address', '-')}")
@@ -180,3 +184,5 @@ def show_admin_panel():
     # Схематичные графики
     analytics.render_analytics_charts(display_df)
     
+    # Блок дней рождения
+    birthdays.render_birthday_alert(df)
