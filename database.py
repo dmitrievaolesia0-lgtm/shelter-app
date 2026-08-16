@@ -8,19 +8,16 @@ import db_dialogs as dialogs
 import db_analytics as analytics
 import db_birthdays as birthdays
 
-# Перенаправляем функции для совместимости с главным файлом app.py
 init_db = core.init_db
 add_recipient = core.add_recipient
 
 def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
     
-    # Кнопка мгновенно сбрасывает кэш и скачивает свежий файл
     if st.button("🔄 Обновить данные из облака", use_container_width=True):
         core.clear_db_cache()
         st.rerun()
         
-    # Данные берутся из быстрого кэша оперативной памяти
     df = core.cached_download()
         
     if df.empty or len(df) == 0:
@@ -38,7 +35,7 @@ def show_admin_panel():
     selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
 
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
-    selected_districts = st.multiselect("Фильтр по районам города (Оставьте пустым для показа ВСЕЙ базы)", options=all_barnaul_districts, default=[])
+    selected_districts = st.multiselect("Фильтр по районам города", options=all_barnaul_districts, default=[])
 
     view_mode = st.radio(
         "Формат вывода данных:",
@@ -51,11 +48,11 @@ def show_admin_panel():
     # 2. РАЗДЕЛЬНЫЙ ПОИСК
     col1, col2 = st.columns(2)
     with col1:
-        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...", key="search_fio_input")
+        search_fio = st.text_input("Поиск по ФИО (можно ввести что-то одно)", placeholder="Гридин или Иван...", key="search_fio_final_v3")
     with col2:
-        search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...")
+        search_phone = st.text_input("Поиск по номеру телефона", placeholder="999...", key="search_phone_final_v3")
 
-    # 3. АКТИВАЦИЯ ПЕРИОДА ПОСЕЩЕНИЯ
+    # 3. ФИЛЬТР ПО ДАТАМ
     st.write("---")
     use_date_filter = st.checkbox("🔄 Фильтровать по периоду посещения", value=False)
     
@@ -77,11 +74,9 @@ def show_admin_panel():
         disabled=not use_date_filter
     )
 
-    # Расчет колонок перед фильтрацией
     df['Возраст'] = df['birth_date'].apply(core.calculate_age)
     df['День недели визита'] = df['visit_date'].apply(core.get_weekday_name)
 
-    # Применение фильтров
     filtered_df = df.copy()
     
     if search_fio:
@@ -97,7 +92,6 @@ def show_admin_panel():
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
 
-    # Сортировка
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
     
@@ -111,7 +105,6 @@ def show_admin_panel():
     st.write("---")
     st.caption(f"НАЙДЕНО ЗАПИСЕЙ В БАЗЕ: {len(display_df)}")
 
-    # Отображение данных
     if view_mode == "Компактный вид (ФИО + Телефон + Район + Дата)":
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
@@ -125,33 +118,27 @@ def show_admin_panel():
             current_phone = row.get('phone', '-')
             
             with st.expander(f"👤 {row.get('fio', 'Без имени')} | 📞 {current_phone} | [{current_district}]"):
-                # 1. КОНТАКТЫ (Кликабельный номер)
+                # 1. Основные контакты и визит
                 callable_phone = analytics.make_phone_callable(current_phone)
                 st.markdown(f"**Контакты:** {callable_phone}", unsafe_allow_html=True)
-
-                # 2. ДАТА ВИЗИТА
                 st.markdown(f"**Дата визита:** {row.get('visit_date', '-')} ({row.get('День недели визита', '-')})")
                 
-                # 3. ССЫЛКИ НА ФОТООТЧЕТ
+                # 2. Ссылки на фото
                 photo_str = row.get('photo_path', '')
-                photo_person = "Не указана"
-                photo_receipt = "Не указана"
+                photo_person, photo_receipt = "Не указана", "Не указана"
                 
                 if photo_str and "|" in str(photo_str):
                     try:
-                        parts = str(photo_str).split("|")
+                        parts = str(photo_path).split("|")
                         for part in parts:
-                            if "Человек:" in part:
-                                photo_person = part.replace("Человек:", "").strip()
-                            if "Расписка:" in part:
-                                photo_receipt = part.replace("Расписка:", "").strip()
-                    except:
-                        pass
+                            if "Человек:" in part: photo_person = part.replace("Человек:", "").strip()
+                            if "Расписка:" in part: photo_receipt = part.replace("Расписка:", "").strip()
+                    except: pass
                 
                 links_html = []
-                if photo_person and photo_person != "Не указана" and photo_person.startswith("http"):
+                if photo_person and photo_person != "Не указана" and str(photo_person).startswith("http"):
                     links_html.append(f'<a href="{photo_person}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото получателя</a>')
-                if photo_receipt and photo_receipt != "Не указана" and photo_receipt.startswith("http"):
+                if photo_receipt and photo_receipt != "Не указана" and str(photo_receipt).startswith("http"):
                     links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото расписки</a>')
                 
                 if links_html:
@@ -159,24 +146,22 @@ def show_admin_panel():
                 else:
                     st.markdown("**Фотоотчет:** Не прикреплен")
                 
-                # 4. ОБНОВЛЕННАЯ ЛОГИКА И ПОРЯДОК ДОПОЛНИТЕЛЬНЫХ ДАННЫХ
-                with st.expander("📝 Показать полную анкету получателя", expanded=False):
-                    st.text(f"Номенклатура выданного корма: {row.get('feed_type', '-')}")
-                    st.text(f"Район проживания: {current_district}")
-                    st.text(f"Адрес проживания: {row.get('address', '-')}")
-                    st.text(f"Паспортные данные: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
-                    st.text(f"Подразделение (выдавшее паспорт): {row.get('passport_issued_by', '-')}")
-                    st.text(f"Дата рождения: {row.get('birth_date', '-')} (Возраст: {row.get('Возраст')})")
+                # 3. ИСПРАВЛЕННЫЙ И СТРОГИЙ ПОРЯДОК СТРОК АНКЕТЫ
+                with st.expander("📝 Дополнительные данные анкеты", expanded=False):
+                    st.markdown(f"**Номенклатура выданного корма:** {row.get('feed_type', '-')}")
+                    st.markdown(f"**Район проживания:** {current_district}")
+                    st.markdown(f"**Адрес проживания:** {row.get('address', '-')}")
+                    st.markdown(f"**Паспортные данные:** {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
+                    st.markdown(f"**Подразделение:** {row.get('passport_code', '-')}")
+                    st.markdown(f"**Дата рождения:** {row.get('birth_date', '-')} (Возраст: {row.get('Возраст')})")
                     
-                    # Кликабельная ссылка на страницу ВК получателя
                     vk_url = row.get('vk_link', '')
                     if vk_url and str(vk_url).startswith("http"):
-                        st.markdown(f"Личная страница получателя: <a href='{vk_url}' target='_blank' style='color: #2C3E50; font-weight: bold; text-decoration: underline;'>Перейти в ВК</a>", unsafe_allow_html=True)
+                        st.markdown(f"**Личная страница ВК:** <a href='{vk_url}' target='_blank' style='color: #2C3E50; font-weight: bold; text-decoration: underline;'>Перейти в ВК</a>", unsafe_allow_html=True)
                     else:
-                        st.text(f"Личная страница получателя ВК: {vk_url if vk_url else '-'}")
+                        st.markdown(f"**Личная страница ВК:** {vk_url if vk_url else '-'}")
                 
                 st.write("---")
-                # Кнопки управления анкетой
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
                     if st.button("✏️ Редактировать", key=f"edit_{idx}", use_container_width=True):
@@ -187,8 +172,5 @@ def show_admin_panel():
                         dialogs.delete_dialog(idx, row.get('fio', 'Без имени'), df)
                         core.clear_db_cache()
 
-    # Схематичные графики
     analytics.render_analytics_charts(display_df)
-    
-    # Блок дней рождения
     birthdays.render_birthday_alert(df)
