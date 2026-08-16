@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import date
 
 def render_date_picker(label="Дата рождения", key_prefix="birth"):
-    """Отрисовывает компонент выбора даты с переключением режимов."""
+    """Отрисовывает компонент выбора даты с расширенным диапазоном лет (от 1930 до 2026)."""
     st.subheader(f"📅 {label}")
     
     mode = st.radio(
@@ -17,7 +17,8 @@ def render_date_picker(label="Дата рождения", key_prefix="birth"):
     if mode == "Пошаговый (Год/Месяц/День)":
         col1, col2, col3 = st.columns(3)
         with col1:
-            year = st.selectbox("Год", range(2026, 1900, -1), key=f"{key_prefix}_year")
+            # Расширили диапазон: от 2026 года назад до 1930 года
+            year = st.selectbox("Год", range(2026, 1929, -1), key=f"{key_prefix}_year")
         with col2:
             month = st.selectbox("Месяц", range(1, 13), key=f"{key_prefix}_month")
         with col3:
@@ -29,9 +30,12 @@ def render_date_picker(label="Дата рождения", key_prefix="birth"):
         except ValueError:
             st.error("Такой даты не существует в выбранном месяце (например, 31 февраля).")
     else:
+        # Для стандартного календаря также расширяем границы выбора
         selected_date = st.date_input(
             "Календарь", 
-            value=date(2000, 1, 1), 
+            value=date(1980, 1, 1), # Начальное значение по умолчанию сдвинули на 1980
+            min_value=date(1930, 1, 1), # Минимальный доступный год
+            max_value=date(2026, 12, 31), # Максимальный доступный год
             key=f"{key_prefix}_calendar",
             format="DD/MM/YYYY"
         )
