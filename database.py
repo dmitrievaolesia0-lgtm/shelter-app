@@ -4,7 +4,6 @@ import requests
 import io
 from datetime import datetime, date
 
-# Получаем токен из скрытых настроек Secrets
 YANDEX_TOKEN = st.secrets.get("YANDEX_TOKEN", "")
 FILE_PATH_ON_DISK = "shelter_base.xlsx"
 
@@ -16,14 +15,11 @@ WEEKDAYS_RU = {
 def download_from_yandex():
     url = f"https://yandex.net{FILE_PATH_ON_DISK}"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
-    
-    # Сразу создаем шаблон правильной пустой таблицы на случай ошибки скачивания
     empty_template = pd.DataFrame(columns=[
         'fio', 'birth_date', 'passport_series', 'passport_number',
         'passport_date', 'passport_code', 'phone', 'district',
         'vk_link', 'address', 'feed_type', 'photo_path', 'visit_date'
     ])
-    
     try:
         res = requests.get(url, headers=headers).json()
         download_url = res.get("href")
@@ -49,21 +45,20 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # Если Яндекс ответил успехом (200 или 201), то файл точно записан
+            # ИСПРАВЛЕНО: Добавлены коды успешного ответа Яндекс.Диска (200, 201)
             if put_res.status_code in:
                 return True
             else:
-                st.error(f"Яндекс.Диск отклонил запись. Код ответа: {put_res.status_code}")
+                st.error(f"Яндекс.Диск отклонил запись. Код: {put_res.status_code}")
         else:
-            st.error("Не удалось получить ссылку для загрузки от Яндекс.Диска. Проверьте YANDEX_TOKEN.")
+            st.error("Не удалось получить ссылку для загрузки от Яндекс.Диска.")
         return False
     except Exception as e:
-        st.error(f"Сбой сети при загрузке в облако: {str(e)}")
+        st.error(f"Ошибка загрузки: {str(e)}")
         return False
 
 def init_db():
     df = download_from_yandex()
-    # Если на диске пусто или файла нет, создаем правильный пустой шаблон
     if df.empty or len(df) == 0:
         empty_df = pd.DataFrame(columns=[
             'fio', 'birth_date', 'passport_series', 'passport_number',
@@ -78,29 +73,25 @@ def add_recipient(data_dict):
         
     df = download_from_yandex()
     
-    # Очищаем таблицу от возможных полностью пустых строк (NaN)
-    if not df.empty:
+    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
     
-    # Если в базе физически пусто — отключаем любые проверки дубликатов и сохраняем
-    if df.empty or len(df) == 0:
+    if df.empty or len(df) == 0 or 'fio' not in df.columns:
         new_row_df = pd.DataFrame([data_dict])
         return upload_to_yandex(new_row_df)
         
     curr_fio = str(data_dict.get('fio', '')).strip().lower()
     curr_phone = str(data_dict.get('phone', '')).strip().lower()
     
-    # Проверка на дубликат срабатывает ТОЛЬКО если в базе реально есть строки
     if curr_fio and curr_phone:
         db_fio = df['fio'].astype(str).str.strip().str.lower()
         db_phone = df['phone'].astype(str).str.strip().str.lower()
         
         duplicate = df[(db_fio == curr_fio) & (db_phone == curr_phone)]
         if not duplicate.empty:
-            st.warning("Внимание: этот человек с таким номером телефона уже зарегистрирован в базе.")
+            st.warning("Этот человек уже есть в базе.")
             return False
 
-    # Добавляем строку и шлем в Яндекс
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
     return upload_to_yandex(updated_df)
@@ -124,13 +115,11 @@ def get_weekday_name(date_str):
 
 def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
-    
     if st.button("🔄 Обновить данные из облака"):
         st.rerun()
         
     df = download_from_yandex()
-    
-    if not df.empty:
+    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
         df = df.dropna(subset=['fio', 'phone']).reset_index(drop=True)
         
     search_fio = st.text_input("Поиск (ФИО / телефон)", placeholder="Введите текст...")
@@ -145,9 +134,7 @@ def show_admin_panel():
     else:
         min_date, max_value = date.today(), date.today()
 
-    if min_date > max_value:
-        min_date = max_value
-
+    if min_date > max_value: min_date = max_value
     date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
 
     sort_options = {
@@ -188,7 +175,6 @@ def show_admin_panel():
         filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
         
     filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
-
     st.session_state.shelter_records = filtered_df
 
     st.write("---")
@@ -198,32 +184,9 @@ def show_admin_panel():
         with st.expander(f"👤 {row.get('fio', 'Без имени')} | {row.get('district', 'Не определен')} район"):
             st.markdown(f"**Контакты:** {row.get('phone', '-')}")
             st.markdown(f"**Дата визита:** {row.get('visit_date', '-')}")
-            
             st.write("---")
             st.caption("ПОЛНАЯ АНКЕТА ПОЛУЧАТЕЛЯ")
             st.text(f"Возраст: {row.get('Возраст')} (д.р. {row.get('birth_date', '-')})")
             st.text(f"Адрес: {row.get('address', '-')}")
             st.text(f"Выданный корм: {row.get('feed_type', '-')}")
             st.text(f"Паспорт: {row.get('passport_series', '-')} {row.get('passport_number', '-')}")
-            
-            st.write("---")
-            st.caption("ССЫЛКИ НА МАТЕРИАЛЫ")
-            vk = row.get('vk_link', '')
-            if vk and vk not in ["Не указана", "nan", "none", ""]:
-                st.link_button("Личный профиль ВК", str(vk), use_container_width=True)
-                
-            p_path = str(row.get('photo_path', ''))
-            if p_path and p_path not in ["nan", "none", ""]:
-                if "Человек:" in p_path:
-                    try:
-                        parts = p_path.split(" | ")
-                        p_url = parts.replace("Человек: ", "").strip()
-                        r_url = parts.replace("Расписка: ", "").strip()
-                        if p_url and p_url != "Не указана":
-                            st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
-                        if r_url and r_url != "Не указана":
-                            st.link_button("Просмотреть фото расписки", r_url, use_container_width=True)
-                    except:
-                        st.text(f"Ссылки: {p_path}")
-                else:
-                    st.text(f"Фото: {p_path}")
