@@ -10,7 +10,7 @@ FILE_PATH_ON_DISK = "shelter_base.xlsx"
 
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
+    3: "4. Четверг", 4: "5. Пятница", 5: "6. суббота", 6: "7. Воскресенье"
 }
 
 def download_from_yandex():
@@ -43,7 +43,6 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # Убрана проблемная проверка кодов, возвращаем True при отправке запроса
             return True
         return False
     except:
@@ -65,35 +64,26 @@ def add_recipient(data_dict):
         
     df = download_from_yandex()
     
-    if df.empty:
-        new_row_df = pd.DataFrame([data_dict])
-        return upload_to_yandex(new_row_df)
+    # Проверка на дубликат строго по ФИО и Номеру телефона (если они заполнены)
+    if not df.empty and 'fio' in df.columns and 'phone' in df.columns:
+        curr_fio = str(data_dict.get('fio', '')).strip().lower()
+        curr_phone = str(data_dict.get('phone', '')).strip().lower()
         
-    p_series = str(data_dict.get('passport_series', '')).strip().lower()
-    p_number = str(data_dict.get('passport_number', '')).strip().lower()
-    
-    empty_markers = ["", "nan", "none", "0", "0000", "-", "б/н", "без номера"]
-    has_valid_passport = (
-        p_series not in empty_markers and 
-        p_number not in empty_markers and 
-        not p_number.startswith("б/н")
-    )
-    
-    if has_valid_passport and 'passport_series' in df.columns and 'passport_number' in df.columns:
-        db_series = df['passport_series'].astype(str).str.strip().str.lower()
-        db_number = df['passport_number'].astype(str).str.strip().str.lower()
-        
-        duplicate = df[(db_series == p_series) & (db_number == p_number)]
-        if not duplicate.empty:
-            return False
+        if curr_fio and curr_phone and curr_phone not in ["", "nan", "none", "-"]:
+            db_fio = df['fio'].astype(str).str.strip().str.lower()
+            db_phone = df['phone'].astype(str).str.strip().str.lower()
+            
+            duplicate = df[(db_fio == curr_fio) & (db_phone == curr_phone)]
+            if not duplicate.empty:
+                return False  # Найден реальный дубликат по ФИО + Телефон
 
     new_row_df = pd.DataFrame([data_dict])
-    updated_df = pd.concat([df, new_row_df], ignore_index=True)
+    updated_df = pd.concat([df, new_row_df], ignore_index=True) if not df.empty else new_row_df
     return upload_to_yandex(updated_df)
 
 def calculate_age(birth_date_str):
     try:
-        if not birth_date_str or pd.isna(birth_date_str) or birth_date_str == "Не указана": 
+        if not birth_date_str or pd.isna(birth_date_str) or birth_date_str in ["Не указана", "Не указан", ""]: 
             return 999
         bd = pd.to_datetime(birth_date_str).date()
         today = datetime.today().date()
@@ -192,16 +182,21 @@ def show_admin_panel():
             st.write("---")
             st.caption("ССЫЛКИ НА МАТЕРИАЛЫ")
             vk = row.get('vk_link', '')
-            if vk and vk != "Не указана":
+            if vk and vk not in ["Не указана", "nan", "none", ""]:
                 st.link_button("Личный профиль ВК", str(vk), use_container_width=True)
                 
             p_path = str(row.get('photo_path', ''))
-            if "Человек:" in p_path:
-                try:
-                    parts = p_path.split(" | ")
-                    p_url = parts.replace("Человек: ", "").strip()
-                    r_url = parts.replace("Расписка: ", "").strip()
-                    st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
-                    st.link_button("Просмотреть фото расписки", r_url, use_container_width=True)
-                except:
-                    st.text(f"Ссылки: {p_path}")
+            if p_path and p_path not in ["nan", "none", ""]:
+                if "Человек:" in p_path:
+                    try:
+                        parts = p_path.split(" | ")
+                        p_url = parts.replace("Человек: ", "").strip()
+                        r_url = parts.replace("Расписка: ", "").strip()
+                        if p_url and p_url != "Не указана":
+                            st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
+                        if r_url and r_url != "Не указана":
+                            st.link_button("Просмотреть фото расписки", r_url, use_container_width=True)
+                    except:
+                        st.text(f"Ссылки: {p_path}")
+                else:
+                    st.text(f"Фото: {p_path}")
