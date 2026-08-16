@@ -125,7 +125,7 @@ with tab1:
             success = db.add_recipient(new_record)
             if success:
                 st.success(f"Запись успешно сохранена: {full_fio}")
-                db.clear_db_cache()
+                st.cache_data.clear()
                 st.rerun()
             else:
                 st.error("Ошибка сохранения: в базе уже есть человек с таким ФИО и номером телефона!")
