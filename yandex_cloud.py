@@ -43,7 +43,7 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            if put_res.status_code in [200, 201, 202]:
+            if put_res.status_code in (200, 201):
                 return True
             else:
                 st.error(f"Яндекс.Диск отклонил запись файла. Код ошибки сервера: {put_res.status_code}")
