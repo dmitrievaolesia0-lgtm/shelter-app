@@ -7,7 +7,7 @@ from datetime import datetime, date
 
 # --- НАСТРОЙКИ ЯНДЕКСА ---
 # Безопасно берем токен из секретов Streamlit или вставляй строку из Полигона
-YANDEX_TOKEN = st.secrets.get("YANDEX_TOKEN", "ВАШ_OAUTH_ТОКЕН_ИЗ_ПОЛИГОНА")
+YANDEX_TOKEN = st.secrets.get("YANDEX_TOKEN", "y0__wgBEK6c7AwY25YDIJG2n9cYMMPvrcoI_bAIpHi-G-EjoZTpgi0P1xOioHU")
 FILE_PATH_ON_DISK = "shelter_base.xlsx"  # Имя файла-таблицы на твоем Яндекс.Диске
 
 WEEKDAYS_RU = {
