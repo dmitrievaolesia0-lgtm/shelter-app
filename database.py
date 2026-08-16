@@ -5,9 +5,10 @@ from datetime import datetime, date
 
 DB_NAME = "shelter_data.db"
 
+# Исправлена опечатка в слове "Суббота"
 WEEKDAYS_RU = {
     0: "1. Понедельник", 1: "2. Вторник", 2: "3. Среда", 
-    3: "4. Четверг", 4: "5. Пятница", 5: "6. Соббота", 6: "7. Воскресенье"
+    3: "4. Четверг", 4: "5. Пятница", 5: "6. Суббота", 6: "7. Воскресенье"
 }
 
 def init_db():
@@ -50,17 +51,20 @@ def add_recipient(data_dict):
 
 def calculate_age(birth_date_str):
     try:
-        if not birth_date_str or birth_date_str == "Не указана": return 999
+        if not birth_date_str or birth_date_str == "Не указана": 
+            return 999
         bd = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
         today = datetime.today().date()
         return today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
-    except Exception: return 999
+    except Exception: 
+        return 999
 
 def get_weekday_name(date_str):
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         return WEEKDAYS_RU[dt.weekday()]
-    except Exception: return "Не определен"
+    except Exception: 
+        return "Не определен"
 
 def show_admin_panel():
     st.caption("АРХИВ И АНАЛИТИКА")
@@ -70,7 +74,6 @@ def show_admin_panel():
     df = pd.read_sql_query("SELECT * FROM recipients", conn)
     conn.close()
 
-    # Фильтры и сортировки показываем всегда, даже если данных пока 0
     search_fio = st.text_input("Поиск (ФИО / телефон)", placeholder="Введите текст...")
     
     all_barnaul_districts = [
@@ -88,20 +91,27 @@ def show_admin_panel():
         default=[]
     )
 
-    if not df.empty:
+    # Безопасная инициализация календаря, если база пуста
+    if not df.empty and len(df) > 0:
         df['visit_date_parsed'] = pd.to_datetime(df['visit_date']).dt.date
-        min_date, max_value = df['visit_date_parsed'].min(), df['visit_date_parsed'].max()
+        min_date = df['visit_date_parsed'].min()
+        max_value = df['visit_date_parsed'].max()
+        # Защита от случая, когда все даты в БД — это один и тот же день
+        if min_date == max_value:
+            date_range = st.date_input("Период посещения", value=(min_date, max_value))
+        else:
+            date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
     else:
-        min_date, max_value = date.today(), date.today()
-
-    date_range = st.date_input("Период посещения", value=(min_date, max_value), min_value=min_date, max_value=max_value)
+        min_date = date.today()
+        # Если данных нет, не передаем min/max ограничения, чтобы календарь не блокировался
+        date_range = st.date_input("Период посещения", value=(min_date, min_date))
 
     sort_options = {
         "Сначала новые визиты": ("visit_date", False),
         "Сначала старые визиты": ("visit_date", True),
         "По районам города (А-Я)": ("district", True),
         "По дням недели визита (Пн-Вс)": ("День недели визита", True),
-        "От старших к младшим (Возраст)": ("Возраст", True),
+        "От старших к младшим (Возраст)": ("Возраст", False),  # Исправлено на False (от старших к младшим)
         "По алфавиту (ФИО)": ("fio", True)
     }
     selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
@@ -115,19 +125,29 @@ def show_admin_panel():
     df['День недели визита'] = df['visit_date'].apply(get_weekday_name)
 
     filtered_df = df.copy()
+    
     if search_fio:
-        filtered_df = filtered_df[filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False) | filtered_df['phone'].astype(str).str.contains(search_fio, na=False)]
+        filtered_df = filtered_df[
+            filtered_df['fio'].astype(str).str.contains(search_fio, case=False, na=False) | 
+            filtered_df['phone'].astype(str).str.contains(search_fio, na=False)
+        ]
     
     if selected_districts:
         filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
         
-    if isinstance(date_range, tuple) and len(date_range) == 2:
+    # Корректная обработка фильтра дат (учитывает и одиночную дату, и кортеж)
+    if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
+    elif isinstance(date_range, date):
+        filtered_df = filtered_df[filtered_df['visit_date_parsed'] == date_range]
 
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
-    filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+    
+    if 'visit_date_parsed' in filtered_df.columns:
+        filtered_df = filtered_df.drop(columns=['visit_date_parsed'])
+        
     filtered_df['Возраст'] = filtered_df['Возраст'].apply(lambda x: "Не указан" if x == 999 else x)
 
     st.write("---")
@@ -150,13 +170,19 @@ def show_admin_panel():
             if row['vk_link'] and row['vk_link'] != "Не указана":
                 st.link_button("Личный профиль ВК", str(row['vk_link']), use_container_width=True)
                 
-            if "Человек:" in str(row['photo_path']):
+            # Исправленный разбор строки с путями фото получателя и расписки
+            photo_path_str = str(row['photo_path'])
+            if "Человек:" in photo_path_str and "Расписка:" in photo_path_str:
                 try:
-                    parts = str(row['photo_path']).split(" | ")
-                    p_url = parts.replace("Человек: ", "")
-                    r_url = parts.replace("Расписка: ", "")
+                    parts = photo_path_str.split(" | ")
+                    # Извлекаем чистые ссылки из элементов списка
+                    p_url = parts[0].replace("Человек: ", "").strip()
+                    r_url = parts[1].replace("Расписка: ", "").strip()
                     
                     st.link_button("Просмотреть фото получателя", p_url, use_container_width=True)
                     st.link_button("Просмотреть фото расписки", r_url, use_container_width=True)
                 except Exception:
-                    st.text(f"Ссылки: {row['photo_path']}")
+                    st.text(f"Ссылки: {photo_path_str}")
+            else:
+                if photo_path_str and photo_path_str != "None" and photo_path_str != "Не указана":
+                    st.text(f"Ссылки: {photo_path_str}")
