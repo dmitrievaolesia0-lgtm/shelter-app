@@ -14,7 +14,7 @@ WEEKDAYS_RU = {
 }
 
 def download_from_yandex():
-    # ИСПРАВЛЕНО: Изменен URL на корректный эндпоинт Cloud API Яндекс.Диска
+    # Используем корректный эндпоинт Cloud API Яндекс.Диска
     url = f"https://yandex.net{FILE_PATH_ON_DISK}"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -37,7 +37,7 @@ def upload_to_yandex(df):
         df.to_excel(writer, index=False)
     output.seek(0)
     
-    # ИСПРАВЛЕНО: Изменен URL на корректный эндпоинт Cloud API для загрузки файла
+    # Используем корректный эндпоинт Cloud API для загрузки файла
     url = f"https://yandex.net{FILE_PATH_ON_DISK}&overwrite=true"
     headers = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
     try:
@@ -45,8 +45,8 @@ def upload_to_yandex(df):
         upload_url = res.get("href")
         if upload_url:
             put_res = requests.put(upload_url, data=output.getvalue())
-            # ИСПРАВЛЕНО: Задан список успешных кодов ответа (200 OK, 201 Created, 202 Accepted)
-            if put_res.status_code in [200, 201, 202]:
+            # ИСПРАВЛЕНО: Добавлен список успешных кодов ответа
+            if put_res.status_code in:
                 return True
         return False
     except:
@@ -63,20 +63,42 @@ def init_db():
         upload_to_yandex(empty_df)
 
 def add_recipient(data_dict):
+    # Если дата визита не передана, ставим сегодняшнюю
     if 'visit_date' not in data_dict or not data_dict['visit_date']:
         data_dict['visit_date'] = datetime.today().strftime('%Y-%m-%d')
         
     df = download_from_yandex()
     
-    if not df.empty and 'passport_series' in df.columns and 'passport_number' in df.columns:
-        duplicate = df[
-            (df['passport_series'].astype(str) == str(data_dict.get('passport_series'))) & 
-            (df['passport_number'].astype(str) == str(data_dict.get('passport_number'))) &
-            (df['passport_number'].astype(str) != "0000")
-        ]
-        if not duplicate.empty and not str(data_dict.get('passport_number')).startswith("б/н"):
-            return False
+    # 1. Если база данных полностью пустая, сразу сохраняем без лишних проверок
+    if df.empty:
+        new_row_df = pd.DataFrame([data_dict])
+        return upload_to_yandex(new_row_df)
+        
+    # 2. Очищаем входящие паспортные данные для проверки
+    p_series = str(data_dict.get('passport_series', '')).strip().lower()
+    p_number = str(data_dict.get('passport_number', '')).strip().lower()
+    
+    # Список заглушек, которые мы считаем "пустым паспортом"
+    empty_markers = ["", "nan", "none", "0", "0000", "-", "б/н", "без номера"]
+    
+    # Паспорт валидный, только если серия и номер заполнены и не являются заглушкой
+    has_valid_passport = (
+        p_series not in empty_markers and 
+        p_number not in empty_markers and 
+        not p_number.startswith("б/н")
+    )
+    
+    # 3. Проверка на дубликат срабатывает ТОЛЬКО если человек ввел полноценный паспорт
+    if has_valid_passport and 'passport_series' in df.columns and 'passport_number' in df.columns:
+        # Очищаем данные в самой базе для точного сравнения
+        db_series = df['passport_series'].astype(str).str.strip().str.lower()
+        db_number = df['passport_number'].astype(str).str.strip().str.lower()
+        
+        duplicate = df[(db_series == p_series) & (db_number == p_number)]
+        if not duplicate.empty:
+            return False  # Запрещаем дубликат, только если совпал реальный паспорт
 
+    # 4. Если паспорт пустой или дубликатов не найдено — спокойно сохраняем
     new_row_df = pd.DataFrame([data_dict])
     updated_df = pd.concat([df, new_row_df], ignore_index=True)
     return upload_to_yandex(updated_df)
@@ -150,12 +172,12 @@ def show_admin_panel():
     if selected_districts:
         filtered_df = filtered_df[filtered_df['district'].isin(selected_districts)]
         
-    # ИСПРАВЛЕНО: Безопасная обработка неполного ввода диапазона дат в Streamlit
+    # Безопасная обработка диапазона дат
     if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
         filtered_df = filtered_df[(filtered_df['visit_date_parsed'] >= start_date) & (filtered_df['visit_date_parsed'] <= end_date)]
 
-    # ИСПРАВЛЕНО: Сортировка выполняется ДО превращения "999" в строку "Не указан", чтобы избежать ошибок типов данных
+    # Сортировка выполняется до перевода возрастов в текстовый вид для исключения ошибок типов данных
     sort_column, ascending_order = sort_options[selected_sort]
     filtered_df = filtered_df.sort_values(by=sort_column, ascending=ascending_order)
     
