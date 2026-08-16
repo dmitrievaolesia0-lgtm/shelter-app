@@ -5,6 +5,7 @@ from datetime import date, datetime
 import yandex_cloud as cloud
 import db_core as core
 import db_dialogs as dialogs
+import db_analytics as analytics
 
 # Перенаправляем функции для совместимости с главным файлом app.py
 init_db = core.init_db
