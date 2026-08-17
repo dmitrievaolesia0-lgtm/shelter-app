@@ -32,46 +32,41 @@ db.init_db()
 # Заголовок системы со смещением вниз
 st.markdown('<div class="custom-title">Система регистрации и учета выдачи корма</div>', unsafe_allow_html=True)
 
-# Инициализация индекса активной вкладки в памяти сессии
-if "active_tab_index" not in st.session_state:
-    st.session_state.active_tab_index = 0
+# Инициализируем флаг успешного сохранения, чтобы управлять кнопками навигации
+if "save_success_flag" not in st.session_state:
+    st.session_state.save_success_flag = False
 
-# Системная очистка текстовых полей формы через прямое обнуление их ключей
-def force_clear_form_fields():
-    for field_key in ["input_last_name", "input_first_name", "input_middle_name", "input_phone", "input_photo_person", "input_photo_receipt"]:
-        st.session_state[field_key] = ""
+# Очистка формы через прямое удаление старых значений из памяти
+def reset_form_fields():
+    for key in ["input_last_name", "input_first_name", "input_middle_name", "input_phone", "input_photo_person", "input_photo_receipt"]:
+        if key in st.session_state:
+            st.session_state[key] = ""
 
-# Модальное окно с выбором дальнейшего направления для оператора
-@st.dialog("Запись успешно сохранена")
-def show_success_navigation_dialog():
-    st.write("Выберите следующее действие для продолжения работы:")
-    col_dialog1, col_dialog2 = st.columns(2)
-    with col_dialog1:
-        if st.button("Добавить еще человека", use_container_width=True):
-            st.rerun()
-    with col_dialog2:
-        if st.button("Перейти в архив", use_container_width=True):
-            st.session_state.active_tab_index = 1
-            st.rerun()
-
-# Формируем вкладки с динамическим переключением индекса из сессии
 tab1, tab2 = st.tabs(["ВВОД ДАННЫХ", "АРХИВ И АНАЛИТИКА"])
 
-# Настройка принудительного открытия нужной вкладки
-if st.session_state.active_tab_index == 1:
-    # Если оператор нажал "Перейти в архив", временно сбрасываем индекс обратно для будущих сессий
-    st.session_state.active_tab_index = 0
-    # Переключаем фокус Streamlit на вторую вкладку
-    with tab2:
-        db_admin.show_admin_panel()
-        st.write("---")
-        if "shelter_records" in st.session_state and not st.session_state.shelter_records.empty:
-            mb.render_barnaul_map(st.session_state.shelter_records)
-    with tab1:
-        pass
-else:
-    # --- ШТАТНЫЙ РЕЖИМ ВКЛАДКИ 1: ВВОД ДАННЫХ ---
-    with tab1:
+# --- ВКЛАДКА 1: ВВОД ДАННЫХ ---
+with tab1:
+    # Если запись только что успешно сохранилась — выводим строгое меню навигации
+    if st.session_state.save_success_flag:
+        st.success("Уведомление: Данные успешно внесены в базу данных.")
+        st.write("Выберите следующее действие для продолжения:")
+        
+        col_nav1, col_nav2 = st.columns(2)
+        with col_nav1:
+            if st.button("Добавить еще человека", key="btn_add_more_success", use_container_width=True):
+                # Сбрасываем флаг успеха и очищаем поля для нового ввода
+                st.session_state.save_success_flag = False
+                reset_form_fields()
+                st.rerun()
+        with col_nav2:
+            if st.button("Перейти в архив", key="btn_go_to_archive_success", use_container_width=True):
+                # Сбрасываем флаг успеха, очищаем поля и просим оператора переключить вкладку вручную
+                st.session_state.save_success_flag = False
+                reset_form_fields()
+                st.info("Пожалуйста, нажмите на вкладку 'АРХИВ И АНАЛИТИКА' вверху экрана.")
+    
+    else:
+        # Стандартный вывод полей формы, если кнопка Сохранить еще не нажата
         last_name = st.text_input("Фамилия", placeholder="Пример: Бортников", key="input_last_name")
         first_name = st.text_input("Имя", placeholder="Пример: Игорь", key="input_first_name")
         middle_name = st.text_input("Отчество", placeholder="Пример: Иванович", key="input_middle_name")
@@ -144,7 +139,7 @@ else:
                     "phone": final_phone, 
                     "district": district,
                     "vk_link": "Не указана",
-                    "address": "Не excavation",
+                    "address": "Не указан",
                     "feed_type": "Не указан",
                     "photo_path": combined_photos, 
                     "visit_date": visit_date_str
@@ -153,16 +148,15 @@ else:
                 success = db.add_recipient(new_record)
                 if success:
                     st.cache_data.clear()
-                    # Принудительно очищаем форму перед открытием диалога
-                    force_clear_form_fields()
-                    # Вызываем строгое окно навигации
-                    show_success_navigation_dialog()
+                    # Включаем флаг успешного сохранения для вывода кнопок
+                    st.session_state.save_success_flag = True
+                    st.rerun()
                 else:
                     st.error("Ошибка: Обнаружен дубликат. Запись с аналогичными ФИО и номером телефона уже существует.")
 
-    # Отрисовка пассивного состояния вкладки 2
-    with tab2:
-        db_admin.show_admin_panel()
-        st.write("---")
-        if "shelter_records" in st.session_state and not st.session_state.shelter_records.empty:
-            mb.render_barnaul_map(st.session_state.shelter_records)
+# --- ВКЛАДКА 2: АРХИВ И АНАЛИТИКА ---
+with tab2:
+    db_admin.show_admin_panel()
+    st.write("---")
+    if "shelter_records" in st.session_state and not st.session_state.shelter_records.empty:
+        mb.render_barnaul_map(st.session_state.shelter_records)
