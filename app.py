@@ -7,6 +7,9 @@ import database as db
 import date_picker as dp
 import map_barnaul as mb
 
+# ИСПРАВЛЕНИЕ: Подключаем файл-мост, который связывает все ваши 4 части
+import db_admin 
+
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
 db.init_db()
 
@@ -131,7 +134,8 @@ with tab1:
                 st.error("Ошибка сохранения: в базе уже есть человек с таким ФИО и номером телефона!")
 
 with tab2:
-    db.show_admin_panel()
+    # ИСПРАВЛЕНИЕ: Вызываем админ-панель через управляющий модуль db_admin
+    db_admin.show_admin_panel()
     st.write("---")
     
     if "shelter_records" in st.session_state and not st.session_state.shelter_records.empty:
