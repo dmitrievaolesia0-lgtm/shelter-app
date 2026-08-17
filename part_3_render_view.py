@@ -25,7 +25,7 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         return week_map.get(str(day_name).strip(), "-")
 
     # =========================================================================
-    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Зафиксирован)
+    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Оригинальная логика с защитой от падения)
     # =========================================================================
     if view_mode == "Компактный вид (Строки)":
         short_df = display_df[['fio', 'phone', 'district']].copy()
@@ -41,17 +41,22 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
             selection_mode="single-row"
         )
         
+        # Безопасное извлечение индекса строки из структуры данных Streamlit
         if event_data and "selection" in event_data and event_data["selection"]["rows"]:
-            clicked_row_index = event_data["selection"]["rows"]
-            target_fio = short_df.iloc[clicked_row_index]['ФИО Получателя']
-            person_rows = filtered_df[filtered_df['fio'] == target_fio]
+            # Получаем первое число из списка выбранных строк (защита от ошибок типов)
+            clicked_row_index = next(iter(event_data["selection"]["rows"]))
             
-            for idx, row in person_rows.iterrows():
-                st.write("---")
-                st.markdown(f"Анкета: {target_fio}")
-                current_district = row.get('district', 'Не определен')
-                current_phone = row.get('phone', '-')
-                render_single_card_contents(row, current_phone, current_district, idx, df, get_short_weekday)
+            # Проверяем, что индекс не выходит за границы текущей таблицы
+            if 0 <= clicked_row_index < len(short_df):
+                target_fio = short_df.iloc[clicked_row_index]['ФИО Получателя']
+                person_rows = filtered_df[filtered_df['fio'] == target_fio]
+                
+                for idx, row in person_rows.iterrows():
+                    st.write("---")
+                    st.markdown(f"Анкета: {target_fio}")
+                    current_district = row.get('district', 'Не определен')
+                    current_phone = row.get('phone', '-')
+                    render_single_card_contents(row, current_phone, current_district, idx, df, get_short_weekday)
 
     # =========================================================================
     # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА (Строгий монохромный список)
@@ -96,5 +101,4 @@ def render_single_card_contents(row, current_phone, current_district, idx, df, g
     if photo_receipt and photo_receipt != "Не указана" and str(photo_receipt).startswith("http"):
         links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; text-decoration: underline;">Фото расписки</a>')
     
-    # Внутренний сбор ссылок (в part_3 они больше не выводятся на экран, вывод строго делегирован в part_4)
     p4.part_4_render_details_and_actions(links_html, row, current_district, idx, df)
