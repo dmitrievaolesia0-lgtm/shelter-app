@@ -1,15 +1,7 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime
-
-import yandex_cloud as cloud
+from datetime import date
 import db_core as core
-import db_dialogs as dialogs
-import db_analytics as analytics
-import db_birthdays as birthdays
-
-init_db = core.init_db
-add_recipient = core.add_recipient
 
 def part_1_prepare_data():
     """Часть 1: Загрузка базы данных из облака и первичные настройки"""
@@ -24,7 +16,7 @@ def part_1_prepare_data():
     if df.empty or len(df) == 0:
         st.write("---")
         st.info("Архив базы данных пуст.")
-        return None, None, None, None
+        return None, None, None, None, None
 
     sort_options = {
         "Сначала новые визиты": ("visit_date", False),
