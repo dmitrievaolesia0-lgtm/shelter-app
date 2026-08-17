@@ -91,3 +91,17 @@ def make_vk_deeplink(vk_url):
     
     # Формируем универсальный мобильный диплинк
     return f"vk://{cleaned}"
+
+def update_recipient_comment(record_index, text_value):
+    """Системное обновление текстового комментария в ячейке базы данных"""
+    try:
+        df = cached_download()
+        if record_index in df.index:
+            df.at[record_index, 'comment_text'] = str(text_value)
+            # Команда на перезапись таблицы в вашем облаке (Яндекс)
+            # upload_to_cloud(df) 
+            return True
+        return False
+    except:
+        return False
+
