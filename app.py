@@ -47,7 +47,7 @@ with tab1:
     if phone_mode == "Мобильный РФ (+7)":
         raw_phone = st.text_input(
             "10 цифр номера (после +7) *", 
-            placeholder="9991234567",
+            placeholder="0000000000",
             max_chars=10
         )
         digits_only = re.sub(r"\D", "", raw_phone)
@@ -80,12 +80,12 @@ with tab1:
     photo_person_link = st.text_input("Ссылка на фото получателя", placeholder="https://vk.com...")
     photo_receipt_link = st.text_input("Ссылка на фото расписки", placeholder="https://vk.com...")
     
-    st.write("---")
+    """st.write("---")
     st.caption("ДОПОЛНИТЕЛЬНЫЕ ДАННЫЕ (НЕОБЯЗАТЕЛЬНО)")
     
     address = st.text_input("Адрес проживания (Улица, дом, кв.)")
     vk_link = st.text_input("Личная страница получателя (ВК)")
-    feed_type = st.text_input("Номенклатура выданного корма")
+    """feed_type = st.text_input("Номенклатура выданного корма")"""
     
     st.write("---")
     st.caption("ПАСПОРТНЫЕ ДАННЫЕ (НЕОБЯЗАТЕЛЬНО)")
@@ -94,7 +94,7 @@ with tab1:
     p_date = st.text_input("Дата выдачи паспорта", placeholder="ДД.ММ.ГГГГ")
     p_code = st.text_input("Код подразделения", max_chars=7, placeholder="000-000")
     
-    birth_date_str = dp.render_date_picker(label="Дата рождения", key_prefix="main_birth")
+    birth_date_str = dp.render_date_picker(label="Дата рождения", key_prefix="main_birth")"""
     
     st.write("---")
     if st.button("СОХРАНИТЬ ЗАПИСЬ", type="primary", use_container_width=True):
