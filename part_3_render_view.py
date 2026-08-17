@@ -10,7 +10,7 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         st.info("По заданным критериям поиска записей не найдено.")
         return
 
-    # Строгие CSS-стили для сжатия карточек и красивого отображения
+    # Строгие деловые CSS-стили для визуального сближения элементов
     st.markdown("""
         <style>
             .styled-card-box {
@@ -59,25 +59,39 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         return dist_map.get(str(dist_name).strip(), "Н/А")
 
     # =========================================================================
-    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Классическая таблица со встроенным экспортом)
+    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Интерактивная таблица с выбором по клику)
     # =========================================================================
     if view_mode == "Компактный вид (Строки)":
-        short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
-        short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
+        # Формируем строгую таблицу БЕЗ даты визита
+        short_df = display_df[['fio', 'phone', 'district']].copy()
+        short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города']
         
-        # Выводим таблицу. Функция скачивания (CSV) встроена в правый верхний угол самой таблицы
-        st.dataframe(short_df, use_container_width=True, hide_index=True)
+        st.caption("ℹ️ Нажмите на любую строку с ФИО в таблице, чтобы открыть анкету человека")
         
-        st.write("---")
-        selected_fio = st.selectbox(
-            "Выберите сотрудника/жителя для вывода параметров управления:",
-            options=["— Не выбрано —"] + list(filtered_df['fio'].unique()),
-            label_visibility="collapsed"
+        # Выводим интерактивную таблицу. Результат клика записывается в переменную 'selected_row'
+        event_data = st.dataframe(
+            short_df, 
+            use_container_width=True, 
+            hide_index=True,
+            on_select="rerun",  # Перезапускает интерфейс мгновенно при клике по строке
+            selection_mode="single-row"  # Позволяет выбрать одну строку за раз
         )
         
-        if selected_fio != "— Не выбрано —":
-            person_rows = filtered_df[filtered_df['fio'] == selected_fio]
+        # Проверяем, кликнул ли оператор по какой-нибудь строке
+        if event_data and "selection" in event_data and event_data["selection"]["rows"]:
+            # Получаем индекс выбранной строки в текущей таблице
+            clicked_row_index = event_data["selection"]["rows"][0]
+            
+            # Извлекаем ФИО человека из выбранной строки
+            target_fio = short_df.iloc[clicked_row_index]['ФИО Получателя']
+            
+            # Находим полные данные этого человека в исходной базе
+            person_rows = filtered_df[filtered_df['fio'] == target_fio]
+            
             for idx, row in person_rows.iterrows():
+                st.write("---")
+                # Выводим анкету без лишних слов «Подробная карточка»
+                st.markdown(f"**Анкета: {target_fio}**")
                 current_district = row.get('district', 'Не определен')
                 current_phone = row.get('phone', '-')
                 render_single_card_contents(row, current_phone, current_district, idx, df)
@@ -111,7 +125,6 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
 
 def render_single_card_contents(row, current_phone, current_district, idx, df):
     """Системный блок вывода внутренних параметров субъекта"""
-    # Строка "Прямой вызов" полностью удалена из интерфейса по требованию
     st.markdown(f"**День визита:** {row.get('День недели визита', '-')}")
     
     photo_str = row.get('photo_path', '')
