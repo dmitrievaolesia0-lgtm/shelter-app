@@ -1,3 +1,7 @@
+import streamlit as st
+import db_core as core
+import db_dialogs as dialogs
+
 def part_4_render_details_and_actions(links_html, row, current_district, idx, df):
     """Часть 4: Личные данные анкеты, кнопки управления (изменить/удалить)"""
     if links_html:
@@ -37,23 +41,3 @@ def part_4_render_details_and_actions(links_html, row, current_district, idx, df
         if st.button("🚨 Удалить", key=f"del_{idx}", use_container_width=True):
             dialogs.delete_dialog(idx, row.get('fio', 'Без имени'), df)
             core.clear_db_cache()
-
-
-def show_admin_panel():
-    """ГЛАВНЫЙ ДИСПЕТЧЕР: Соединяет все 4 части кода в единое рабочее приложение"""
-    # 1. Запускаем первую часть для загрузки данных
-    df, sort_options, selected_sort, selected_districts, view_mode = part_1_prepare_data()
-    
-    # Если база пустая — прерываем выполнение
-    if df is None:
-        return
-        
-    # 2. Передаем данные во вторую часть для фильтрации таблиц
-    filtered_df, display_df = part_2_filter_data(df, sort_options, selected_sort, selected_districts)
-    
-    # 3. Передаем результаты в третью часть для отрисовки интерфейса
-    part_3_render_view(view_mode, filtered_df, display_df, df)
-    
-    # 4. В самом конце выводим общие графики аналитики и напоминания о днях рождения
-    analytics.render_analytics_charts(display_df)
-    birthdays.render_birthday_alert(df)
