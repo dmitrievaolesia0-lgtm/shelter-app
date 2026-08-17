@@ -4,7 +4,7 @@ from datetime import date
 import db_core as core
 
 def part_1_prepare_data():
-    """Часть 1: Загрузка базы данных из облака и первичные настройки"""
+    """Часть 1: Инициализация данных и подготовка критериев сортировки/фильтрации"""
     st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
     
     if st.button("🔄 Обновить данные из облака", use_container_width=True):
@@ -18,21 +18,26 @@ def part_1_prepare_data():
         st.info("Архив базы данных пуст.")
         return None, None, None, None, None
 
+    # Понятные и строгие критерии сортировки для оператора
     sort_options = {
-        "Сначала новые визиты": ("visit_date", False),
-        "Сначала старые визиты": ("visit_date", True),
-        "От старших к младшим (Возраст)": ("Возраст", True),
-        "По алфавиту (ФИО)": ("fio", True)
+        "По дате визита (сначала новые)": ("visit_date", False),
+        "По дате визита (сначала старые)": ("visit_date", True),
+        "По алфавиту (ФИО: А-Я)": ("fio", True),
+        "По возрасту (от старших к младшим)": ("Возраст", True)
     }
-    selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_sort = st.selectbox("Сортировка списка жителей", list(sort_options.keys()))
+    with col2:
+        view_mode = st.radio(
+            "Формат вывода карточек:",
+            ["Полная анкета (Карточки)", "Компактный вид (Строки)"],
+            horizontal=True
+        )
 
+    # Мультивыбор районов (можно выбрать один, несколько или смотреть все)
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
-    selected_districts = st.multiselect("Фильтр по районам города", options=all_barnaul_districts, default=[])
-
-    view_mode = st.radio(
-        "Формат вывода данных:",
-        ["Полная анкета (Карточки)", "Компактный вид (ФИО + Телефон + Район + Дата)"],
-        horizontal=True
-    )
+    selected_districts = st.multiselect("Фильтр по административным районам", options=all_barnaul_districts, default=[])
     
     return df, sort_options, selected_sort, selected_districts, view_mode
