@@ -1,0 +1,46 @@
+import streamlit as st
+import pandas as pd
+from datetime import date, datetime
+
+import yandex_cloud as cloud
+import db_core as core
+import db_dialogs as dialogs
+import db_analytics as analytics
+import db_birthdays as birthdays
+
+init_db = core.init_db
+add_recipient = core.add_recipient
+
+def part_1_prepare_data():
+    """Часть 1: Загрузка базы данных из облака и первичные настройки"""
+    st.caption("АРХИВ И АНАЛИТИКА (ОБЛАКО ЯНДЕКС)")
+    
+    if st.button("🔄 Обновить данные из облака", use_container_width=True):
+        core.clear_db_cache()
+        st.rerun()
+        
+    df = core.cached_download()
+        
+    if df.empty or len(df) == 0:
+        st.write("---")
+        st.info("Архив базы данных пуст.")
+        return None, None, None, None
+
+    sort_options = {
+        "Сначала новые визиты": ("visit_date", False),
+        "Сначала старые визиты": ("visit_date", True),
+        "От старших к младшим (Возраст)": ("Возраст", True),
+        "По алфавиту (ФИО)": ("fio", True)
+    }
+    selected_sort = st.selectbox("Сортировка списка", list(sort_options.keys()))
+
+    all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
+    selected_districts = st.multiselect("Фильтр по районам города", options=all_barnaul_districts, default=[])
+
+    view_mode = st.radio(
+        "Формат вывода данных:",
+        ["Полная анкета (Карточки)", "Компактный вид (ФИО + Телефон + Район + Дата)"],
+        horizontal=True
+    )
+    
+    return df, sort_options, selected_sort, selected_districts, view_mode
