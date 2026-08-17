@@ -54,19 +54,16 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
                 render_single_card_contents(row, current_phone, current_district, idx, df, get_short_weekday)
 
     # =========================================================================
-    # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА
+    # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА (Строгий монохромный список)
     # =========================================================================
     else:
-        # Инструкция полностью сохранена по вашему требованию
         st.caption("Нажмите на строку реестра для раскрытия параметров и добавления комментариев")
         
         for idx, row in filtered_df.iterrows():
             current_district = row.get('district', 'Не определен')
             fio_text = row.get('fio', 'Без имени')
             
-            row_header = f"{fio_text}"
-            
-            with st.expander(row_header, expanded=False):
+            with st.expander(fio_text, expanded=False):
                 render_single_card_contents(row, None, current_district, idx, df, get_short_weekday)
 
 
@@ -82,6 +79,7 @@ def render_single_card_contents(row, current_phone, current_district, idx, df, g
     st.markdown(f"Район проживания: {current_district}")
     st.markdown(f"Номенклатура выданного корма: {row.get('feed_type', '-')}")
     
+    # Парсинг фотоотчета
     photo_str = row.get('photo_path', '')
     photo_person, photo_receipt = "Не указана", "Не указана"
     if photo_str and "|" in str(photo_str):
@@ -98,4 +96,5 @@ def render_single_card_contents(row, current_phone, current_district, idx, df, g
     if photo_receipt and photo_receipt != "Не указана" and str(photo_receipt).startswith("http"):
         links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; text-decoration: underline;">Фото расписки</a>')
     
+    # Внутренний сбор ссылок (в part_3 они больше не выводятся на экран, вывод строго делегирован в part_4)
     p4.part_4_render_details_and_actions(links_html, row, current_district, idx, df)
