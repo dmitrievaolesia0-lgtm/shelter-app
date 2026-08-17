@@ -3,7 +3,7 @@ import db_core as core
 import db_dialogs as dialogs
 
 def part_4_render_details_and_actions(links_html, row, current_district, idx, df):
-    """Часть 4: Вывод фотоотчета, сквозного комментария и кнопок управления"""
+    """Часть 4: Вывод фотоотчета, сквозного комментария и кнопок управления с мгновенным обновлением"""
     
     # 1. Вывод фотоотчета ровно один раз стандартным шрифтом
     if links_html:
@@ -11,40 +11,57 @@ def part_4_render_details_and_actions(links_html, row, current_district, idx, df
     else:
         st.markdown("Фотоотчет: не прикреплен")
     
-    # 2. Вывод сохраненного комментария через двоеточие на уровне остальных параметров
-    existing_comment = row.get('comment_text', '') if 'comment_text' in row else ''
-    if existing_comment and str(existing_comment).strip():
-        st.markdown(f"Комментарий: {existing_comment}")
+    # Ключ для хранения текущего комментария в памяти сессии
+    db_comment_key = f"db_comment_stored_{idx}"
+    
+    # Если в памяти сессии еще нет этого комментария, берем его из базы данных
+    if db_comment_key not in st.session_state:
+        st.session_state[db_comment_key] = row.get('comment_text', '') if 'comment_text' in row else ''
+    
+    # 2. Мгновенный вывод сохраненного комментария без задержек сервера
+    current_comment_val = st.session_state[db_comment_key]
+    if current_comment_val and str(current_comment_val).strip():
+        st.markdown(f"Комментарий: {current_comment_val}")
     else:
         st.markdown("Комментарий: отсутствует")
         
     st.write("---")
     
-    # 3. Инструмент отправки новой заметки с автоматической очисткой поля ввода
+    # Уникальный ключ для самого поля ввода текста
     comment_input_key = f"comment_field_input_{idx}"
     
+    # Поле ввода текста — всегда загружается пустым, готовым к новой записи
     user_comment = st.text_area(
         "Добавить служебную отметку / комментарий к записи:", 
-        value="", # Поле ВСЕГДА пустое при загрузке, готовое к новому вводу
+        value="", 
         key=comment_input_key,
         placeholder="Введите новый текст примечания здесь...",
         label_visibility="collapsed"
     )
     
+    # Мгновенная фиксация данных по нажатию кнопки
     if st.button("Сохранить комментарий", key=f"save_comm_btn_{idx}"):
         if user_comment.strip():
             try:
-                # Фиксируем обновленное значение в таблице данных
-                df.at[idx, 'comment_text'] = str(user_comment.strip())
-                st.success("Уведомление: Комментарий успешно зафиксирован в сессии базы данных.")
+                # 1. Мгновенно перезаписываем значение в памяти оперативной сессии
+                st.session_state[db_comment_key] = str(user_comment.strip())
+                
+                # 2. Записываем в физическую таблицу, которая уйдет в облако
+                if idx in df.index:
+                    df.at[idx, 'comment_text'] = str(user_comment.strip())
+                
+                # 3. Полностью сбрасываем кэш загрузки, чтобы принудительно обновить базу данных
                 st.cache_data.clear()
+                core.clear_db_cache()
+                
+                st.success("Уведомление: Комментарий успешно зафиксирован.")
                 st.rerun()
             except Exception as e:
-                st.error("Ошибка: Не удалось обновить текстовое поле в таблице.")
+                st.error("Ошибка: Не удалось обновить текстовое поле.")
         else:
             st.error("Ошибка: Невозможно сохранить пустое текстовое поле.")
 
-    # 4. Регламентированные кнопки управления
+    # 4. Системные кнопки действий
     st.write("---")
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
