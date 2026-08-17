@@ -1,3 +1,8 @@
+import streamlit as st
+import pandas as pd
+from datetime import date
+import db_core as core
+
 def part_2_filter_data(df, sort_options, selected_sort, selected_districts):
     """Часть 2: Фильтрация данных по поисковым запросам и датам"""
     st.write("---")
