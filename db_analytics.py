@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 def show_analytics_panel(df):
-    """Модуль аналитики: Группировка и вывод жителей по административным районам со скроллом"""
+    """Модуль аналитики: Безопасный и строгий вывод жителей по районам города"""
     if df.empty:
         st.info("Нет данных для построения отчетов.")
         return
@@ -10,10 +10,10 @@ def show_analytics_panel(df):
     st.write("---")
     st.caption("СПИСКИ ЖИТЕЛЕЙ ПО АДМИНИСТРАТИВНЫМ РАЙОНАМ")
     
-    # Полный список районов для строгого соответствия структуре системы
+    # Полный список районов Барнаула
     all_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
 
-    # Перебираем каждый район города по очереди
+    # Перебираем каждый район по очереди
     for district in all_districts:
         district_df = df[df['district'] == district]
         count_in_district = len(district_df)
@@ -25,33 +25,22 @@ def show_analytics_panel(df):
             if district_df.empty:
                 st.caption("В данном районе зарегистрированных записей не найдено.")
             else:
-                # Контейнер с автопрокруткой (скроллом) для экономии места
-                html_scroll_block = """
-                <div style="max-height: 250px; overflow-y: auto; padding-right: 5px; font-family: sans-serif; font-size: 14px; color: #111111; line-height: 1.4;">
-                """
-                
-                # Построчный вывод жителей без лишнего визуального шума дат
+                # Выводим жителей района с помощью стандартных инструментов Streamlit
                 for idx, row in district_df.iterrows():
                     fio_text = row.get('fio', 'Без имени')
                     phone_val = row.get('phone', '-')
                     
-                    # Формируем прямую ссылку для совершения звонка
+                    # Очищаем телефон для создания безопасной ссылки для звонка
                     clean_phone = str(phone_val).replace(" ", "").replace("(", "").replace(")", "").replace("-", "")
                     
-                    # Аккуратная верстка: ФИО сверху, кликабельный телефон с трубкой снизу, даты полностью удалены
-                    html_scroll_block += f"""
-                    <div style="margin-bottom: 10px; border-bottom: 1px solid #EEEEEE; padding-bottom: 6px;">
-                        <div style="font-weight: 500; color: #111111;">{fio_text}</div>
-                        <div style="font-size: 13px; color: #555555; margin-top: 2px;">
-                            <a href="tel:{clean_phone}" style="color: #0066CC; text-decoration: underline;">📞 {phone_val}</a>
-                        </div>
-                    </div>
-                    """
-                
-                html_scroll_block += "</div>"
-                
-                # Безопасно рендерим структурированный список на экран
-                st.markdown(html_scroll_block, unsafe_allow_html=True)
+                    # 1. Сверху выводим ФИО стандартным текстом
+                    st.text(fio_text)
+                    
+                    # 2. Снизу под ФИО выводим кликабельный телефон с трубкой в виде чистой ссылки
+                    st.markdown(f"[📞 {phone_val}](tel:{clean_phone})")
+                    
+                    # 3. Добавляем тонкую черту между разными людьми внутри списка
+                    st.markdown("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #EEEEEE;'/>", unsafe_allow_html=True)
 
 def make_phone_callable(phone_str):
     """Вспомогательная функция для создания кликабельной ссылки на номер телефона"""
