@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import date
 
-def render_date_picker(label="Дата рождения", key_prefix="birth"):
+def render_date_picker(label="Дата рождения1", key_prefix="birth"):
     """Минималистичный выбор даты рождения в едином стиле с текстовыми полями."""
     # label передается напрямую в st.date_input, что делает шрифт точно таким же, как у st.text_input
     selected_date = st.date_input(
