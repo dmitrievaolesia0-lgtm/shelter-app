@@ -5,31 +5,30 @@ import db_dialogs as dialogs
 def part_4_render_details_and_actions(links_html, row, current_district, idx, df):
     """Часть 4: Вывод строго ограниченных данных, кнопок управления и автономных комментариев"""
     
-    # Отображение статуса фотоотчета без эмодзи и жирного шрифта
+    # Одиночный вывод статуса фотоотчета без жирного шрифта по вашему правилу
     if links_html:
         st.markdown(f"Фотоотчет: {' | '.join(links_html)}", unsafe_allow_html=True)
     else:
         st.markdown("Фотоотчет: не прикреплен")
     
-    # Вкладка дополнительных данных: строго Номенклатура и Район без выделений текста
-    with st.expander("Дополнительные данные анкеты", expanded=False):
-        st.markdown(f"Номенклатура выданного корма: {row.get('feed_type', '-')}")
-        st.markdown(f"Район проживания: {current_district}")
-
     st.write("---")
     
-    # Блок ввода комментариев обычным системным шрифтом
     comment_key = f"comment_field_{idx}"
     existing_comment = row.get('comment_text', '') if 'comment_text' in row else ''
     
+    # Если в базе уже есть сохраненный комментарий — выводим его аккуратно отдельной строкой сверху
+    if existing_comment and str(existing_comment).strip():
+        st.markdown(f"Сохраненный комментарий: {existing_comment}")
+    
+    # Текстовое поле ввода для добавления или изменения заметки
     user_comment = st.text_area(
         "Комментарий к записи (введите текст):", 
         value=existing_comment,
         key=comment_key,
-        placeholder="Введите служебные отметки или примечания..."
+        placeholder="Введите служебные отметки или примечания...",
+        label_visibility="collapsed" # Скрываем заголовок поля для компактности
     )
     
-    # Автономное сохранение комментария в сессии данных
     if st.button("Сохранить комментарий", key=f"save_comm_btn_{idx}"):
         try:
             df.at[idx, 'comment_text'] = str(user_comment)
@@ -37,9 +36,9 @@ def part_4_render_details_and_actions(links_html, row, current_district, idx, df
             st.cache_data.clear()
             st.rerun()
         except Exception as e:
-            st.error("Ошибка: Не удалось обновить текстовое поле в текущей сессии таблицы.")
+            st.error("Ошибка: Не удалось обновить текстовое поле.")
 
-    # Строгие системные кнопки управления без значков
+    # Строгие системные кнопки действий
     st.write("---")
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
