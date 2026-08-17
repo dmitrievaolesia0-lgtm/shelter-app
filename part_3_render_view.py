@@ -4,7 +4,7 @@ import db_analytics as analytics
 import part_4_render_details_and_actions as p4
 
 def part_3_render_view(view_mode, filtered_df, display_df, df):
-    """Часть 3: Восстановленный стабильный вывод данных в компактном и полном виде"""
+    """Часть 3: Высокоскоростной, монохромный и строго регламентированный вывод данных"""
     
     if filtered_df.empty:
         st.info("По заданным критериям поиска записей не найдено.")
@@ -25,24 +25,49 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         return week_map.get(str(day_name).strip(), "-")
 
     # =========================================================================
-    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Строгий список строк с кнопками-анкетами)
+    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Ваша оригинальная интерактивная таблица)
     # =========================================================================
     if view_mode == "Компактный вид (Строки)":
-        st.caption("Нажмите на имя человека, чтобы развернуть его карточку")
+        short_df = display_df[['fio', 'phone', 'district']].copy()
+        short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города']
         
-        # Выводим компактные строки через привычные интерактивные элементы
-        for idx, row in filtered_df.iterrows():
-            fio_text = row.get('fio', 'Без имени')
-            phone_val = row.get('phone', '-')
-            district_val = get_short_district(row.get('district', 'Не определен'))
-            
-            # Создаем аккуратную строку-кнопку для каждого жителя
-            with st.expander(f"{fio_text}  |  {phone_val}  |  {district_val}", expanded=False):
-                current_district = row.get('district', 'Не определен')
-                render_single_card_contents(row, phone_val, current_district, idx, df, get_short_weekday)
+        st.caption("ℹ️ Нажмите на галочку или строку с ФИО в таблице, чтобы открыть анкету человека")
+        
+        # Ваша оригинальная таблица с сохранением всего внешнего вида
+        event_data = st.dataframe(
+            short_df, 
+            use_container_width=True, 
+            hide_index=True,
+            on_select="rerun", 
+            selection_mode="single-row"
+        )
+        
+        # БЕЗОПАСНОЕ ИСПРАВЛЕНИЕ: Извлекаем выбранную строку по ФИО, защищая от ValueError
+        if event_data and "selection" in event_data and event_data["selection"]["rows"]:
+            try:
+                # Получаем чистый номер строки, на которую нажали
+                clicked_row_list = event_data["selection"]["rows"]
+                clicked_row_index = clicked_row_list[0] if isinstance(clicked_row_list, list) else clicked_row_list
+                
+                # Строгая проверка границ, чтобы код не падал
+                if 0 <= clicked_row_index < len(short_df):
+                    target_fio = short_df.iloc[clicked_row_index]['ФИО Получателя']
+                    
+                    # Находим человека в исходной отфильтрованной базе строго по имени
+                    person_rows = filtered_df[filtered_df['fio'] == target_fio]
+                    
+                    for idx, row in person_rows.iterrows():
+                        st.write("---")
+                        st.markdown(f"Анкета: {target_fio}")
+                        current_district = row.get('district', 'Не определен')
+                        current_phone = row.get('phone', '-')
+                        render_single_card_contents(row, current_phone, current_district, idx, df, get_short_weekday)
+            except Exception as e:
+                # Если произошел внутренний сдвиг индексов, мягко предупреждаем, не ломая интерфейс
+                st.caption("Перевыберите строку для синхронизации данных.")
 
     # =========================================================================
-    # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА (Стандартный расширенный вид)
+    # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА (Строгий монохромный реестр)
     # =========================================================================
     else:
         st.caption("Нажмите на строку реестра для раскрытия параметров и добавления комментариев")
@@ -56,7 +81,7 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
 
 
 def render_single_card_contents(row, current_phone, current_district, idx, df, get_short_weekday_func):
-    """Системный блок вывода внутренних параметров субъекта без жирного шрифта"""
+    """Системный ... вывода параметров"""
     phone_to_call = current_phone if current_phone else row.get('phone', '-')
     callable_phone = analytics.make_phone_callable(phone_to_call)
     
@@ -67,7 +92,6 @@ def render_single_card_contents(row, current_phone, current_district, idx, df, g
     st.markdown(f"Район проживания: {current_district}")
     st.markdown(f"Номенклатура выданного корма: {row.get('feed_type', '-')}")
     
-    # Парсинг фотоотчета
     photo_str = row.get('photo_path', '')
     photo_person, photo_receipt = "Не указана", "Не указана"
     if photo_str and "|" in str(photo_str):
