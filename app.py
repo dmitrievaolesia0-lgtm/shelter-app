@@ -8,11 +8,12 @@ import date_picker as dp
 import map_barnaul as mb
 import db_admin 
 
-# Настройка страницы и адаптивных отступов для планшетов
+# Настройка страницы с адаптивным размещением под разные экраны
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
 
 st.markdown("""
     <style>
+        /* Увеличенный верхний отступ предотвращает наложение шапки Streamlit на планшетах */
         .block-container {
             padding-top: 4.0rem !important;
             padding-bottom: 0rem !important;
@@ -31,7 +32,9 @@ db.init_db()
 # Заголовок системы со смещением вниз
 st.markdown('<div class="custom-title">Система регистрации и учета выдачи корма</div>', unsafe_allow_html=True)
 
-# Функция мгновенной очистки полей без перезагрузки
+if "active_tab_index" not in st.session_state:
+    st.session_state.active_tab_index = 0
+
 def reset_form():
     st.session_state["input_last_name"] = ""
     st.session_state["input_first_name"] = ""
@@ -40,12 +43,10 @@ def reset_form():
     st.session_state["input_photo_person"] = ""
     st.session_state["input_photo_receipt"] = ""
 
-# Понятные и заметные вкладки вверху экрана
-tab1, tab2 = tab_input, tab_archive = st.tabs(["ВВОД ДАННЫХ", "АРХИВ И АНАЛИТИКА"])
+tab1, tab2 = st.tabs(["ВВОД ДАННЫХ", "АРХИВ И АНАЛИТИКА"])
 
 # --- ВКЛАДКА 1: ВВОД ДАННЫХ ---
 with tab1:
-    # Обычный режим отображения полей ввода — всё работает быстро и наглядно
     last_name = st.text_input("Фамилия", placeholder="Пример: Бортников", key="input_last_name")
     first_name = st.text_input("Имя", placeholder="Пример: Игорь", key="input_first_name")
     middle_name = st.text_input("Отчество", placeholder="Пример: Иванович", key="input_middle_name")
@@ -61,9 +62,7 @@ with tab1:
         max_value=date.today()
     )
     
-    st.write("---")
-    st.caption("Контактные данные")
-    
+    # Поле телефона поднято вплотную к дате визита без полос и лишних заголовков
     user_phone_input = st.text_input(
         "Номер телефона (допускается вставка скопированной строки)", 
         placeholder="89991234567",
@@ -87,6 +86,7 @@ with tab1:
     else:
         phone_error = "НЕ_ЗАПОЛНЕН"
 
+    # Строгая разделительная полоса теперь установлена ТОЛЬКО перед блоком фотофиксации
     st.write("---")
     st.caption("Фотофиксация (необязательно)")
     photo_person_link = st.text_input("Ссылка на фото получателя", placeholder="https://...", key="input_photo_person")
@@ -94,7 +94,6 @@ with tab1:
     
     st.write("---")
     
-    # Главная кнопка действия
     if st.button("Сохранить запись", use_container_width=True):
         if not last_name.strip(): 
             st.error("Ошибка: Поле 'Фамилия' обязательно для заполнения.")
@@ -130,10 +129,10 @@ with tab1:
             
             success = db.add_recipient(new_record)
             if success:
+                st.success(f"Уведомление: Данные внесены в базу данных. Субъект: {full_fio}")
                 st.cache_data.clear()
-                st.success(f"Уведомление: Данные внесены в базу данных. Субъект: {full_fio}. Форма готова для ввода следующей записи.")
-                # Мгновенно очищаем форму в памяти без задержек и перезагрузок
                 reset_form()
+                st.rerun()
             else:
                 st.error("Ошибка: Обнаружен дубликат. Запись с аналогичными ФИО и номером телефона уже существует.")
 
