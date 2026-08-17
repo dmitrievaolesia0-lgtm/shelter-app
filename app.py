@@ -35,13 +35,11 @@ st.markdown('<div class="custom-title">Система регистрации и 
 if "active_tab_index" not in st.session_state:
     st.session_state.active_tab_index = 0
 
+# ИСПРАВЛЕНО: Безопасный сброс формы через очистку кэша виджетов
 def reset_form():
-    st.session_state["input_last_name"] = ""
-    st.session_state["input_first_name"] = ""
-    st.session_state["input_middle_name"] = ""
-    st.session_state["input_phone"] = ""
-    st.session_state["input_photo_person"] = ""
-    st.session_state["input_photo_receipt"] = ""
+    for key in ["input_last_name", "input_first_name", "input_middle_name", "input_phone", "input_photo_person", "input_photo_receipt"]:
+        if key in st.session_state:
+            del st.session_state[key]
 
 tab1, tab2 = st.tabs(["ВВОД ДАННЫХ", "АРХИВ И АНАЛИТИКА"])
 
@@ -86,7 +84,7 @@ with tab1:
     else:
         phone_error = "НЕ_ЗАПОЛНЕН"
 
-    # Строгая разделительная полоса теперь установлена ТОЛЬКО перед блоком фотофиксации
+    # Строгая разделительная полоса перед блоком фотофиксации
     st.write("---")
     st.caption("Фотофиксация (необязательно)")
     photo_person_link = st.text_input("Ссылка на фото получателя", placeholder="https://...", key="input_photo_person")
