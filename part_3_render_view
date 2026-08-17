@@ -1,3 +1,9 @@
+import streamlit as st
+import pandas as pd
+import db_analytics as analytics
+# Импортируем четвертую часть, так как третья часть вызывает ее внутри себя
+import part_4_render_details_and_actions as p4
+
 def part_3_render_view(view_mode, filtered_df, display_df, df):
     """Часть 3: Вывод данных на экран (Таблица или Карточки людей)"""
     if view_mode == "Компактный вид (ФИО + Телефон + Район + Дата)":
@@ -31,8 +37,8 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
                 links_html = []
                 if photo_person and photo_person != "Не указана" and str(photo_person).startswith("http"):
                     links_html.append(f'<a href="{photo_person}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото получателя</a>')
-                if photo_receipt and photo_receipt != "Не указана" and str(photo_receipt).startswith("http"):
+                if photo_receipt and photo_receipt != "Не unknown" and str(photo_receipt).startswith("http"):
                     links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото расписки</a>')
                 
-                # Передаем управление четвертой части для отрисовки внутренностей карточки
-                part_4_render_details_and_actions(links_html, row, current_district, idx, df)
+                # Передаем управление четвертой части (через импортированный модуль)
+                p4.part_4_render_details_and_actions(links_html, row, current_district, idx, df)
