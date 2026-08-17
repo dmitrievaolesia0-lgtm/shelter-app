@@ -8,14 +8,13 @@ import date_picker as dp
 import map_barnaul as mb
 import db_admin 
 
-# 1. КРАСИВЫЙ ДИЗАЙН: Убираем гигантский пустой отступ сверху страницы
+# Настройка страницы и минимизация вертикальных отступов
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
 
 st.markdown("""
     <style>
-        /* Сжимаем пустые отступы сверху, чтобы заголовок поднялся выше */
         .block-container {
-            padding-top: 1.5rem !important;
+            padding-top: 1.0rem !important;
             padding-bottom: 0rem !important;
         }
         div.stSubheader {
@@ -27,76 +26,91 @@ st.markdown("""
 
 db.init_db()
 
-# Наш главный заголовок теперь аккуратно прижат кверху
-st.subheader("📝 Регистрация и учет выдачи корма")
+st.subheader("Система регистрации и учета выдачи корма")
 
+# Инициализация переменной состояния вкладок
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "Ввод данных"
+
+# Функция сброса значений полей формы
+def reset_form():
+    st.session_state["input_last_name"] = ""
+    st.session_state["input_first_name"] = ""
+    st.session_state["input_middle_name"] = ""
+    st.session_state["input_phone"] = ""
+    st.session_state["input_photo_person"] = ""
+    st.session_state["input_photo_receipt"] = ""
+
+# Формирование структуры вкладок
 tab1, tab2 = st.tabs(["Ввод данных", "Архив и аналитика"])
 
+if st.session_state.active_tab == "Архив и аналитика":
+    current_tab = tab2
+else:
+    current_tab = tab1
+
+# --- ВКЛАДКА 1: ВВОД ДАННЫХ ---
 with tab1:
-    st.caption("ОБЯЗАТЕЛЬНЫЕ ДАННЫЕ")
+    st.caption("Обязательные данные")
     
-    last_name = st.text_input("Фамилия *", placeholder="Бортников")
-    first_name = st.text_input("Имя *", placeholder="Игорь")
-    middle_name = st.text_input("Отчество *", placeholder="Иванович")
+    last_name = st.text_input("Фамилия", placeholder="Пример: Бортников", key="input_last_name")
+    first_name = st.text_input("Имя", placeholder="Пример: Игорь", key="input_first_name")
+    middle_name = st.text_input("Отчество", placeholder="Пример: Иванович", key="input_middle_name")
     
     district = st.selectbox(
-        "Район проживания в Барнауле *", 
+        "Район проживания в Барнауле", 
         ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     )
     
     visit_date_selected = st.date_input(
-        "Дата визита *",
+        "Дата визита",
         value=date.today(),
         max_value=date.today()
     )
     
     st.write("---")
-    st.caption("КОНТАКТНЫЕ ДАННЫЕ")
+    st.caption("Контактные данные")
     
-    # 2. УПРОЩЕНИЕ: Одно поле для телефона. Можно вставлять скопированное как угодно!
     user_phone_input = st.text_input(
-        "Номер телефона * (можно просто вставить скопированный номер)", 
-        placeholder="8 (999) 123-45-67 или +7999..."
+        "Номер телефона (допускается вставка скопированной строки)", 
+        placeholder="89991234567",
+        key="input_phone"
     )
     
-    # Логика автоматической очистки вставленного номера
     phone_error = None
     final_phone = user_phone_input.strip()
     
     if final_phone:
-        # Извлекаем из строки только чистые цифры
         digits_only = re.sub(r"\D", "", final_phone)
-        
-        # Если номер начинается с 8 или 7 и в нем 11 цифр (стандартный мобильный РФ)
         if len(digits_only) == 11 and (digits_only.startswith("7") or digits_only.startswith("8")):
-            # Откусываем первую цифру и приводим к красивому единому виду +7 (...) ...-..-..
             main_part = digits_only[1:]
             final_phone = f"+7 ({main_part[:3]}) {main_part[3:6]}-{main_part[6:8]}-{main_part[8:10]}"
-            st.caption(f"✅ Номер распознан и отформатирован: {final_phone}")
-        # Если вставили ровно 10 цифр без семерок/восьмерок
+            st.caption(f"Формат определен: {final_phone}")
         elif len(digits_only) == 10:
             final_phone = f"+7 ({digits_only[:3]}) {digits_only[3:6]}-{digits_only[6:8]}-{digits_only[8:10]}"
-            st.caption(f"✅ Номер отформатирован: {final_phone}")
-        # Если вставили какой-то другой формат (городской или короткий)
+            st.caption(f"Формат определен: {final_phone}")
         else:
-            st.caption(f"ℹ️ Номер сохранен в исходном виде: {final_phone}")
+            st.caption(f"Строка сохранена без изменений: {final_phone}")
     else:
         phone_error = "НЕ_ЗАПОЛНЕН"
 
     st.write("---")
-    st.caption("ФОТОФИКСАЦИЯ ВЫДАЧИ (НЕОБЯЗАТЕЛЬНО)")
-    photo_person_link = st.text_input("Ссылка на фото получателя", placeholder="https://vk.com...")
-    photo_receipt_link = st.text_input("Ссылка на фото расписки", placeholder="https://vk.com...")
-    
-    # Поля дополнительных и паспортных данных закомментированы, чтобы не загромождать экран
-    # (код скрыт с помощью символа #)
+    st.caption("Фотофиксация (необязательно)")
+    photo_person_link = st.text_input("Ссылка на фото получателя", placeholder="https://...", key="input_photo_person")
+    photo_receipt_link = st.text_input("Ссылка на фото расписки", placeholder="https://...", key="input_photo_receipt")
     
     st.write("---")
-    if st.button("СОХРАНИТЬ ЗАПИСЬ", type="primary", use_container_width=True):
-        if not last_name.strip(): st.error("Укажите фамилию")
-        elif not first_name.strip(): st.error("Укажите имя")
-        elif not middle_name.strip(): st.error("Укажите отчество")
-        elif phone_error == "НЕ_ЗАПОЛНЕН": st.error("Укажите номер телефона")
+    
+    # Кнопка сохранения в стандартном монохромном оформлении
+    if st.button("Сохранить запись", use_container_width=True):
+        if not last_name.strip(): 
+            st.error("Ошибка: Поле 'Фамилия' обязательно для заполнения.")
+        elif not first_name.strip(): 
+            st.error("Ошибка: Поле 'Имя' обязательно для заполнения.")
+        elif not middle_name.strip(): 
+            st.error("Ошибка: Поле 'Отчество' обязательно для заполнения.")
+        elif phone_error == "НЕ_ЗАПОЛНЕН": 
+            st.error("Ошибка: Поле 'Номер телефона' обязательно для заполнения.")
         else:
             full_fio = f"{last_name.strip()} {first_name.strip()} {middle_name.strip()}"
             visit_date_str = visit_date_selected.strftime('%Y-%m-%d')
@@ -123,12 +137,20 @@ with tab1:
             
             success = db.add_recipient(new_record)
             if success:
-                st.success(f"Запись успешно сохранена: {full_fio}")
+                st.success(f"Уведомление: Данные внесены в базу данных. Субъект: {full_fio}")
                 st.cache_data.clear()
+                reset_form()
+                
+                st.write("---")
+                if st.button("Перейти в раздел: Архив и аналитика", use_container_width=True):
+                    st.session_state.active_tab = "Архив и аналитика"
+                    st.rerun()
+                
                 st.rerun()
             else:
-                st.error("Ошибка сохранения: в базе уже есть человек с таким ФИО и номером телефона!")
+                st.error("Ошибка: Обнаружен дубликат. Запись с аналогичными ФИО и номером телефона уже существует.")
 
+# --- ВКЛАДКА 2: АРХИВ И АНАЛИТИКА ---
 with tab2:
     db_admin.show_admin_panel()
     st.write("---")
