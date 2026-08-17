@@ -8,29 +8,33 @@ import date_picker as dp
 import map_barnaul as mb
 import db_admin 
 
-# Настройка страницы и минимизация вертикальных отступов
+# Настройка страницы и базовых параметров контейнера
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
 
 st.markdown("""
     <style>
         .block-container {
-            padding-top: 1.0rem !important;
+            padding-top: 2.0rem !important; /* Увеличили отступ, чтобы опустить заголовок ниже */
             padding-bottom: 0rem !important;
         }
-        div.stSubheader {
-            margin-top: 0rem !important;
-            padding-top: 0rem !important;
+        /* Стилизация уменьшенного делового заголовка */
+        .custom-title {
+            font-size: 20px !important; /* В два раза меньше стандартного subheader */
+            font-weight: 600;
+            color: #31333F;
+            margin-bottom: 1.0rem;
         }
     </style>
 """, unsafe_allow_html=True)
 
 db.init_db()
 
-st.subheader("Система регистрации и учета выдачи корма")
+# Уменьшенный и опущенный заголовок системы
+st.markdown('<div class="custom-title">Система регистрации и учета выдачи корма</div>', unsafe_allow_html=True)
 
-# Инициализация переменной состояния вкладок
+# Инициализация переменной управления вкладками
 if "active_tab" not in st.session_state:
-    st.session_state.active_tab = "Ввод данных"
+    st.session_state.active_tab = 0  # Слой 0 = Ввод данных, Слой 1 = Архив
 
 # Функция сброса значений полей формы
 def reset_form():
@@ -41,10 +45,11 @@ def reset_form():
     st.session_state["input_photo_person"] = ""
     st.session_state["input_photo_receipt"] = ""
 
-# Формирование структуры вкладок
+# Формирование структуры вкладок с привязкой к автоматическому переключателю
 tab1, tab2 = st.tabs(["Ввод данных", "Архив и аналитика"])
 
-if st.session_state.active_tab == "Архив и аналитика":
+# Синхронизация отображения вкладок на основе сохраненного состояния
+if st.session_state.active_tab == 1:
     current_tab = tab2
 else:
     current_tab = tab1
@@ -101,7 +106,7 @@ with tab1:
     
     st.write("---")
     
-    # Кнопка сохранения в стандартном монохромном оформлении
+    # Кнопка сохранения в монохромном деловом исполнении
     if st.button("Сохранить запись", use_container_width=True):
         if not last_name.strip(): 
             st.error("Ошибка: Поле 'Фамилия' обязательно для заполнения.")
@@ -141,11 +146,8 @@ with tab1:
                 st.cache_data.clear()
                 reset_form()
                 
-                st.write("---")
-                if st.button("Перейти в раздел: Архив и аналитика", use_container_width=True):
-                    st.session_state.active_tab = "Архив и аналитика"
-                    st.rerun()
-                
+                # ВАЖНО: Изменение индекса вкладки и мгновенная перезагрузка для автоперехода
+                st.session_state.active_tab = 1
                 st.rerun()
             else:
                 st.error("Ошибка: Обнаружен дубликат. Запись с аналогичными ФИО и номером телефона уже существует.")
