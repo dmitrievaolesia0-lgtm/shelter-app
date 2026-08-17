@@ -8,35 +8,34 @@ import date_picker as dp
 import map_barnaul as mb
 import db_admin 
 
-# Настройка страницы и базовых параметров контейнера
+# Настройка страницы и адаптивных отступов для планшетов
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
 
 st.markdown("""
     <style>
         .block-container {
-            padding-top: 2.0rem !important; /* Увеличили отступ, чтобы опустить заголовок ниже */
+            padding-top: 4.0rem !important;
             padding-bottom: 0rem !important;
         }
-        /* Стилизация уменьшенного делового заголовка */
         .custom-title {
-            font-size: 20px !important; /* В два раза меньше стандартного subheader */
+            font-size: 20px !important;
             font-weight: 600;
             color: #31333F;
-            margin-bottom: 1.0rem;
+            margin-bottom: 1.5rem;
         }
     </style>
 """, unsafe_allow_html=True)
 
 db.init_db()
 
-# Уменьшенный и опущенный заголовок системы
+# Заголовок системы со смещением вниз
 st.markdown('<div class="custom-title">Система регистрации и учета выдачи корма</div>', unsafe_allow_html=True)
 
-# Инициализация переменной управления вкладками
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = 0  # Слой 0 = Ввод данных, Слой 1 = Архив
+# Безопасная инициализация индекса активной вкладки
+if "active_tab_index" not in st.session_state:
+    st.session_state.active_tab_index = 0
 
-# Функция сброса значений полей формы
+# Функция очистки текстовых полей формы
 def reset_form():
     st.session_state["input_last_name"] = ""
     st.session_state["input_first_name"] = ""
@@ -45,18 +44,20 @@ def reset_form():
     st.session_state["input_photo_person"] = ""
     st.session_state["input_photo_receipt"] = ""
 
-# Формирование структуры вкладок с привязкой к автоматическому переключателю
-tab1, tab2 = st.tabs(["Ввод данных", "Архив и аналитика"])
+# Строгая и безопасная структура вкладок на базе числовых индексов
+tab_options = ["Ввод данных", "Архив и аналитика"]
+selected_tab = st.radio(
+    "Навигация по разделам системы",
+    options=tab_options,
+    index=st.session_state.active_tab_index,
+    label_visibility="collapsed"
+)
 
-# Синхронизация отображения вкладок на основе сохраненного состояния
-if st.session_state.active_tab == 1:
-    current_tab = tab2
-else:
-    current_tab = tab1
+st.write("---")
 
-# --- ВКЛАДКА 1: ВВОД ДАННЫХ ---
-with tab1:
-    st.caption("Обязательные данные")
+# --- РАЗДЕЛ: ВВОД ДАННЫХ ---
+if selected_tab == "Ввод данных":
+    # Строка "Обязательные данные" полностью удалена по вашему требованию
     
     last_name = st.text_input("Фамилия", placeholder="Пример: Бортников", key="input_last_name")
     first_name = st.text_input("Имя", placeholder="Пример: Игорь", key="input_first_name")
@@ -106,7 +107,6 @@ with tab1:
     
     st.write("---")
     
-    # Кнопка сохранения в монохромном деловом исполнении
     if st.button("Сохранить запись", use_container_width=True):
         if not last_name.strip(): 
             st.error("Ошибка: Поле 'Фамилия' обязательно для заполнения.")
@@ -146,14 +146,14 @@ with tab1:
                 st.cache_data.clear()
                 reset_form()
                 
-                # ВАЖНО: Изменение индекса вкладки и мгновенная перезагрузка для автоперехода
-                st.session_state.active_tab = 1
+                # Принудительно меняем индекс активной вкладки на 1 (Архив) и перезапускаем
+                st.session_state.active_tab_index = 1
                 st.rerun()
             else:
                 st.error("Ошибка: Обнаружен дубликат. Запись с аналогичными ФИО и номером телефона уже существует.")
 
-# --- ВКЛАДКА 2: АРХИВ И АНАЛИТИКА ---
-with tab2:
+# --- РАЗДЕЛ: АРХИВ И АНАЛИТИКА ---
+elif selected_tab == "Архив и аналитика":
     db_admin.show_admin_panel()
     st.write("---")
     
