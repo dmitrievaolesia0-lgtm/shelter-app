@@ -10,20 +10,19 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         st.info("По заданным критериям поиска записей не найдено.")
         return
 
-    # Внедряем строгие CSS-стили для сжатия карточек и красивого отображения
+    # Строгие CSS-стили для сжатия карточек и красивого отображения
     st.markdown("""
         <style>
-            /* Сближаем блоки карточек друг к другу, убирая лишние отступы */
             .styled-card-box {
                 padding: 10px 14px;
                 border: 1px solid #E6E8F0;
                 border-radius: 4px;
-                margin-bottom: 4px !important; /* Минимальный зазор между карточками */
+                margin-bottom: 4px !important;
                 background-color: #FFFFFF;
             }
             .card-header-flex {
                 display: flex;
-                flex-wrap: wrap; /* Автоперенос телефона на планшетах */
+                flex-wrap: wrap;
                 justify-content: space-between;
                 align-items: center;
                 font-size: 15px;
@@ -48,7 +47,6 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         </style>
     """, unsafe_allow_html=True)
 
-    # Функция для строгого делового сокращения административных районов Барнаула
     def get_short_district(dist_name):
         dist_map = {
             "Железнодорожный": "ЖД",
@@ -61,31 +59,31 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
         return dist_map.get(str(dist_name).strip(), "Н/А")
 
     # =========================================================================
-    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Строгая классическая таблица + Интерактивный выбор)
+    # ВАРИАНТ А: КОМПАКТНЫЙ ВИД (Классическая таблица со встроенным экспортом)
     # =========================================================================
     if view_mode == "Компактный вид (Строки)":
-        # 1. Возвращаем чистую таблицу, как она выводилась изначально
         short_df = display_df[['fio', 'phone', 'district', 'visit_date']].copy()
         short_df.columns = ['ФИО Получателя', 'Номер телефона', 'Район города', 'Дата визита']
+        
+        # Выводим таблицу. Функция скачивания (CSV) встроена в правый верхний угол самой таблицы
         st.dataframe(short_df, use_container_width=True, hide_index=True)
         
         st.write("---")
-        # 2. Делаем таблицу кликабельной: выбор человека для открытия большой подробной карты анкеты
         selected_fio = st.selectbox(
-            "📍 Выберите человека из таблицы выше для открытия полной анкеты и управления:",
-            options=["— Не выбрано —"] + list(filtered_df['fio'].unique())
+            "Выберите сотрудника/жителя для вывода параметров управления:",
+            options=["— Не выбрано —"] + list(filtered_df['fio'].unique()),
+            label_visibility="collapsed"
         )
         
         if selected_fio != "— Не выбрано —":
             person_rows = filtered_df[filtered_df['fio'] == selected_fio]
             for idx, row in person_rows.iterrows():
-                st.markdown(f"### Подробная карточка: {selected_fio}")
                 current_district = row.get('district', 'Не определен')
                 current_phone = row.get('phone', '-')
                 render_single_card_contents(row, current_phone, current_district, idx, df)
 
     # =========================================================================
-    # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА (Компактные сближенные плитки-карточки)
+    # ВАРИАНТ Б: ПОЛНАЯ АНКЕТА (Компактные плитки-карточки)
     # =========================================================================
     else:
         for idx, row in filtered_df.iterrows():
@@ -93,7 +91,6 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
             short_dist = get_short_district(current_district)
             current_phone = row.get('phone', '-')
             
-            # Строим плотную, красивую плитку с автопереносом телефона под имя, если мало места
             st.markdown(f"""
                 <div class="styled-card-box">
                     <div class="card-header-flex">
@@ -108,15 +105,13 @@ def part_3_render_view(view_mode, filtered_df, display_df, df):
                 </div>
             """, unsafe_allow_html=True)
             
-            # Внутренности карточки (паспорт, кнопки, фото) теперь аккуратно открываются под плиткой
-            with st.expander("📝 Открыть системные действия и архивные данные анкеты", expanded=False):
+            with st.expander("📝 Открыть архивные данные и действия", expanded=False):
                 render_single_card_contents(row, current_phone, current_district, idx, df)
 
 
 def render_single_card_contents(row, current_phone, current_district, idx, df):
-    """Вспомогательный системный блок для вывода внутренних параметров субъекта"""
-    callable_phone = analytics.make_phone_callable(current_phone)
-    st.markdown(f"**Прямой вызов:** {callable_phone}", unsafe_allow_html=True)
+    """Системный блок вывода внутренних параметров субъекта"""
+    # Строка "Прямой вызов" полностью удалена из интерфейса по требованию
     st.markdown(f"**День визита:** {row.get('День недели визита', '-')}")
     
     photo_str = row.get('photo_path', '')
@@ -137,5 +132,4 @@ def render_single_card_contents(row, current_phone, current_district, idx, df):
     if photo_receipt and photo_receipt != "Не указана" and str(photo_receipt).startswith("http"):
         links_html.append(f'<a href="{photo_receipt}" target="_blank" style="color: #2C3E50; font-weight: bold; text-decoration: underline;">Фото расписки</a>')
     
-    # Передача управления в Часть 4 (Кнопки "Изменить", "Удалить", Паспорт, ВК)
     p4.part_4_render_details_and_actions(links_html, row, current_district, idx, df)
