@@ -30,8 +30,14 @@ def render_barnaul_map(df_recipients=None):
                     "phone": row.get('phone', '-')
                 })
 
-    # Создаем карту с базовым центром в Барнауле
-    m = folium.Map(location=[53.3450, 83.7500], zoom_start=11, tiles="OpenStreetMap")
+
+    m = folium.Map(
+        location=[53.3450, 83.7500], 
+        zoom_start=11, 
+        tiles="OpenStreetMap",
+        attr='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+    )
+
 
     # Отрисовываем маркеры на карте
     for district, coords in BARNAUL_DISTRICTS.items():
