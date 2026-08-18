@@ -62,16 +62,15 @@ def part_4_render_details_and_actions(links_html, row, current_district, idx, df
             st.error("Ошибка: Невозможно сохранить пустое текстовое поле.")
 
 
-    # 4. Системные кнопки действий (Редактировать / Удалить)
+        # 4. Системные кнопки действий
     st.write("---")
     btn_col1, btn_col2 = st.columns(2)
     
     with btn_col1:
         if st.button("Редактировать", key=f"edit_{idx}", use_container_width=True):
             if hasattr(dialogs, 'edit_dialog'):
-                dialogs.edit_dialog(idx, row, df)
-                if hasattr(core, 'clear_db_cache'): core.clear_db_cache()
-                st.rerun()
+                # Передаем только индекс и строку (без передачи старого full_df)
+                dialogs.edit_dialog(idx, row)
             else:
                 st.error("Ошибка: Компонент редактирования недоступен.")
                 
@@ -79,8 +78,7 @@ def part_4_render_details_and_actions(links_html, row, current_district, idx, df
         if st.button("Удалить", key=f"del_{idx}", use_container_width=True):
             if hasattr(dialogs, 'delete_dialog'):
                 fio_name = row.get('fio', 'Без имени')
-                dialogs.delete_dialog(idx, fio_name, df)
-                if hasattr(core, 'clear_db_cache'): core.clear_db_cache()
-                st.rerun()
+                # Передаем только индекс и имя человека для удаления
+                dialogs.delete_dialog(idx, fio_name)
             else:
                 st.error("Ошибка: Компонент удаления недоступен.")
