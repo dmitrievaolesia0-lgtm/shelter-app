@@ -34,10 +34,7 @@ def render_barnaul_map(df_recipients=None):
     m = folium.Map(
         location=[53.3450, 83.7500], 
         zoom_start=11, 
-        tiles="OpenStreetMap",
-        attr='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
-    )
-
+        tiles="OpenStreetMap", attribution_control=False)
 
     # Отрисовываем маркеры на карте
     for district, coords in BARNAUL_DISTRICTS.items():
