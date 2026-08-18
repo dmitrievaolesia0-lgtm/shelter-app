@@ -38,38 +38,29 @@ def part_4_render_details_and_actions(links_html, row, current_district, idx, df
         placeholder="Введите новый текст примечания здесь...",
         label_visibility="collapsed"
     )
-    
-    # Кнопка сохранения комментария
+
+        # Мгновенная фиксация данных по нажатию кнопки
     if st.button("Сохранить комментарий", key=f"save_comm_btn_{idx}"):
         cleaned_comment = user_comment.strip()
         
         if cleaned_comment:
-            try:
-                # Мгновенно обновляем состояние интерфейса
-                st.session_state[db_comment_key] = cleaned_comment
-                
-                # Безопасное сохранение в DataFrame (с проверкой существования индекса)
-                if df is not None and idx in df.index:
-                    df.at[idx, 'comment_text'] = cleaned_comment
-                
-                # Сброс кэша базы данных (вызываем точечную очистку вашего модуля core)
-                if hasattr(core, 'clear_db_cache'):
-                    core.clear_db_cache()
-                else:
-                    st.cache_data.clear()  # Откат, если кастомного метода нет
-                
+            # 1. Мгновенно обновляем локальное состояние сессии для отрисовки на экране
+            st.session_state[db_comment_key] = cleaned_comment
+            
+            # 2. Вызываем физическое сохранение в облако Яндекс через db_core
+            if core.update_recipient_comment(idx, cleaned_comment):
                 st.success("Уведомление: Комментарий успешно зафиксирован.")
                 
-                # Безопасный перезапуск интерфейса (совместимость версий)
+                # Безопасный перезапуск интерфейса (совместимость версий Streamlit)
                 if hasattr(st, "rerun"):
                     st.rerun()
                 else:
                     st.experimental_rerun()
-                    
-            except Exception as e:
-                st.error(f"Ошибка: Не удалось обновить текстовое поле. Детали: {e}")
+            else:
+                st.error("Ошибка: Не удалось сохранить изменения в облако Яндекс.")
         else:
             st.error("Ошибка: Невозможно сохранить пустое текстовое поле.")
+
 
     # 4. Системные кнопки действий (Редактировать / Удалить)
     st.write("---")
