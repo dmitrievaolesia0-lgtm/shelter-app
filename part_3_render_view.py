@@ -95,9 +95,7 @@ def render_single_card_contents(row, current_phone, current_district, idx, df, g
             f'<a href="{photo_receipt}" target="_blank" '
             f'style="color: #2C3E50; text-decoration: underline;">Фото расписки</a>'
         )
-        
-    if links_html:
-        st.markdown("  |  ".join(links_html), unsafe_allow_html=True)
+   
     
     # Безопасный вызов Части 4
     try:
