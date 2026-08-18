@@ -11,7 +11,8 @@ BARNAUL_DISTRICTS = {
     "Октябрьский": [53.3694, 83.7667],
     "Центральный": [53.3222, 83.7783]
 }
-
+    
+st.markdown("<style>.leaflet-attribution-flag { display: none !important; }</style>", unsafe_allow_html=True)
 def render_barnaul_map(df_recipients=None):
     """
     Отрисовывает строгую интерактивную карту Барнаула со списками людей.
