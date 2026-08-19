@@ -12,7 +12,7 @@ def part_2_filter_data(df, sort_options, selected_sort, selected_districts):
     st.write("---")
     col1, col2 = st.columns(2)
     with col1:
-        search_fio = st.text_input("Поиск по фамилии / имени", placeholder="Ведите text...", key="search_fio_v4_strict")
+        search_fio = st.text_input("Поиск по фамилии / имени", placeholder="Введите текст...", key="search_fio_v4_strict")
     with col2:
         search_phone = st.text_input("Поиск по цифрам телефона", placeholder="999...", key="search_phone_v4_strict")
 
@@ -62,7 +62,6 @@ def part_2_filter_data(df, sort_options, selected_sort, selected_districts):
     st.session_state.shelter_records = display_df
     total_records = len(display_df)
 
-    # ИСПРАВЛЕНО: Убрали полосы, сделали надпись мелкой и компактной
     st.caption(f"Найдено записей в базе данных: {total_records}")
     
     limit_per_page = 15
@@ -71,7 +70,7 @@ def part_2_filter_data(df, sort_options, selected_sort, selected_districts):
         if "current_page_num" not in st.session_state:
             st.session_state.current_page_num = 1
             
-        page_col1, page_col2, page_col3 = st.columns()
+        page_col1, page_col2, page_col3 = st.columns([1, 2, 1])
         with page_col1:
             if st.button("⬅️ Назад", disabled=st.session_state.current_page_num == 1, use_container_width=True):
                 st.session_state.current_page_num -= 1
