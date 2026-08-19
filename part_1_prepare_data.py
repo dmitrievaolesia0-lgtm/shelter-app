@@ -18,7 +18,6 @@ def part_1_prepare_data():
         st.info("Архив базы данных пуст.")
         return None, None, None, None, None
 
-    # Понятные и строгие критерии сортировки для оператора
     sort_options = {
         "По дате визита (сначала новые)": ("visit_date", False),
         "По дате визита (сначала старые)": ("visit_date", True),
@@ -35,7 +34,6 @@ def part_1_prepare_data():
             horizontal=True
         )
 
-    # Мультивыбор районов (можно выбрать один, несколько или смотреть все)
     all_barnaul_districts = ["Железнодорожный", "Индустриальный", "Ленинский", "Октябрьский", "Центральный", "Не определен"]
     selected_districts = st.multiselect("Фильтр по административным районам", options=all_barnaul_districts, default=[])
     
