@@ -3,7 +3,6 @@ from datetime import date
 
 def render_date_picker(label="Дата рождения1", key_prefix="birth"):
     """Минималистичный выбор даты рождения в едином стиле с текстовыми полями."""
-    # label передается напрямую в st.date_input, что делает шрифт точно таким же, как у st.text_input
     selected_date = st.date_input(
         label=label, 
         value=date(1990, 1, 1),        
@@ -12,7 +11,6 @@ def render_date_picker(label="Дата рождения1", key_prefix="birth"):
         key=f"{key_prefix}_calendar",
         format="DD.MM.YYYY"            
     )
-    
     return selected_date.strftime('%Y-%m-%d')
 
 if __name__ == "__main__":
