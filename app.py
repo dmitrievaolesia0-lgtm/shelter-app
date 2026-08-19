@@ -7,7 +7,6 @@ import database as db
 import date_picker as dp
 import map_barnaul as mb
 import db_admin 
-# Интеграция разработанного модуля аварийного восстановления
 import db_recovery as rec
 
 # Настройка страницы с адаптивным размещением под разные экраны
@@ -146,14 +145,12 @@ with tab1:
                 
                 success = db.add_recipient(new_record)
                 if success:
-                    # АВТОМАТИЧЕСКИЙ БЭКАП: скачиваем текущее актуальное состояние и пишем на диск
                     try:
                         import db_core
                         current_df = db_core.cached_download()
                         recovery_manager = rec.SystemRecoveryManager()
                         recovery_manager.execute_dump(current_df)
-                    except Exception as backup_err:
-                        # Ошибка бэкапа не должна прерывать работу оператора
+                    except Exception:
                         pass
 
                     st.cache_data.clear()
