@@ -7,6 +7,8 @@ import database as db
 import date_picker as dp
 import map_barnaul as mb
 import db_admin 
+# Интеграция разработанного модуля аварийного восстановления
+import db_recovery as rec
 
 # Настройка страницы с адаптивным размещением под разные экраны
 st.set_page_config(page_title="Учет выдачи корма", layout="centered")
@@ -46,7 +48,7 @@ tab1, tab2 = st.tabs(["ВВОД ДАННЫХ", "АРХИВ И АНАЛИТИКА
 
 # --- ВКЛАДКА 1: ВВОД ДАННЫХ ---
 with tab1:
-    # Если запись только что успешно сохранилась — выводим строгое меню навигации
+    # Если запись только что успешно сохранилась — выводим меню навигации
     if st.session_state.save_success_flag:
         st.success("Уведомление: Данные успешно внесены в базу данных.")
         st.write("Выберите следующее действие для продолжения:")
@@ -54,19 +56,16 @@ with tab1:
         col_nav1, col_nav2 = st.columns(2)
         with col_nav1:
             if st.button("Добавить еще человека", key="btn_add_more_success", use_container_width=True):
-                # Сбрасываем флаг успеха и очищаем поля для нового ввода
                 st.session_state.save_success_flag = False
                 reset_form_fields()
                 st.rerun()
         with col_nav2:
             if st.button("Перейти в архив", key="btn_go_to_archive_success", use_container_width=True):
-                # Сбрасываем флаг успеха, очищаем поля и просим оператора переключить вкладку вручную
                 st.session_state.save_success_flag = False
                 reset_form_fields()
                 st.info("Пожалуйста, нажмите на вкладку 'АРХИВ И АНАЛИТИКА' вверху экрана.")
     
     else:
-        # Стандартный вывод полей формы, если кнопка Сохранить еще не нажата
         last_name = st.text_input("Фамилия", placeholder="Пример: Бортников", key="input_last_name")
         first_name = st.text_input("Имя", placeholder="Пример: Игорь", key="input_first_name")
         middle_name = st.text_input("Отчество", placeholder="Пример: Иванович", key="input_middle_name")
@@ -147,8 +146,17 @@ with tab1:
                 
                 success = db.add_recipient(new_record)
                 if success:
+                    # АВТОМАТИЧЕСКИЙ БЭКАП: скачиваем текущее актуальное состояние и пишем на диск
+                    try:
+                        import db_core
+                        current_df = db_core.cached_download()
+                        recovery_manager = rec.SystemRecoveryManager()
+                        recovery_manager.execute_dump(current_df)
+                    except Exception as backup_err:
+                        # Ошибка бэкапа не должна прерывать работу оператора
+                        pass
+
                     st.cache_data.clear()
-                    # Включаем флаг успешного сохранения для вывода кнопок
                     st.session_state.save_success_flag = True
                     st.rerun()
                 else:
